@@ -2,13 +2,9 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-PLIST="$HOME/Library/LaunchAgents/com.memoryos.menubar.plist"
-APP="$ROOT/menubar/dist/MemoryOS.app"
+PLIST="$HOME/Library/LaunchAgents/com.memoryos.scheduler.plist"
 LOG_DIR="$ROOT/.logs"
 
-if [[ "${MEMORYOS_SKIP_BUILD:-0}" != "1" || ! -x "$APP/Contents/MacOS/MemoryOS" ]]; then
-  "$ROOT/scripts/build_menubar.sh"
-fi
 mkdir -p "$HOME/Library/LaunchAgents" "$LOG_DIR"
 
 cat > "$PLIST" <<PLIST
@@ -18,25 +14,29 @@ cat > "$PLIST" <<PLIST
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.memoryos.menubar</string>
+  <string>com.memoryos.scheduler</string>
+  <key>WorkingDirectory</key>
+  <string>$ROOT</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/usr/bin/open</string>
-    <string>-gj</string>
-    <string>$APP</string>
+    <string>/usr/bin/env</string>
+    <string>bash</string>
+    <string>$ROOT/scripts/start_scheduler.sh</string>
   </array>
   <key>RunAtLoad</key>
   <true/>
+  <key>KeepAlive</key>
+  <true/>
   <key>StandardOutPath</key>
-  <string>$LOG_DIR/menubar.out.log</string>
+  <string>$LOG_DIR/scheduler.out.log</string>
   <key>StandardErrorPath</key>
-  <string>$LOG_DIR/menubar.err.log</string>
+  <string>$LOG_DIR/scheduler.err.log</string>
 </dict>
 </plist>
 PLIST
 
 launchctl bootout "gui/$UID" "$PLIST" >/dev/null 2>&1 || true
 launchctl bootstrap "gui/$UID" "$PLIST"
-launchctl enable "gui/$UID/com.memoryos.menubar"
+launchctl enable "gui/$UID/com.memoryos.scheduler"
 
 echo "Installed $PLIST"

@@ -8,12 +8,55 @@ MemoryOS has three main pieces:
 - Web UI: the browser app at `http://127.0.0.1:5173`.
 - Capture tools: the Chrome extension and optional macOS daemon/menu bar app.
 
+## One-Command Install
+
+From the repository root:
+
+```sh
+scripts/install_memoryos.sh
+```
+
+The installer handles the normal local setup:
+
+- Creates `.venv` and installs Python dependencies.
+- Uses the lightweight TF-IDF search runtime by default.
+- Installs/builds the React web UI.
+- Installs and starts Ollama through Homebrew.
+- Pulls the local `mistral` model if it is missing.
+- Builds the Swift daemon and menu bar app.
+- Registers launch agents for the backend, web UI, daemon, menu bar app, and Phase 7 scheduler.
+
+Expected local URLs after install:
+
+```text
+Backend: http://127.0.0.1:8765
+Web UI:  http://127.0.0.1:5173
+```
+
+If you want the app installed quickly and do not want to wait for the local LLM download:
+
+```sh
+scripts/install_memoryos.sh --skip-model-pull
+```
+
+Useful installer flags:
+
+```sh
+scripts/install_memoryos.sh --skip-native       # backend/web only
+scripts/install_memoryos.sh --skip-ollama       # no local LLM setup
+scripts/install_memoryos.sh --no-launch-agents  # install dependencies only
+scripts/install_memoryos.sh --with-embeddings   # add Torch, sentence-transformers, FAISS
+scripts/install_memoryos.sh --model llama3.2    # use a different Ollama model
+```
+
+The parts that may take longer than five minutes on a cold machine are downloading the local LLM model and installing the optional embedding extras. If `mistral` is already present, the installer skips that model download.
+
 ## Ask An Agent To Run It
 
 If you are using an AI coding agent, point it at this repository and paste this:
 
 ```text
-You are in the MemoryOS repository. Read README.md and docs/QUICKSTART.md, then run MemoryOS locally. Install the needed Python and Node dependencies, start the FastAPI backend, start the React web UI, add one test capture, build a TF-IDF index, verify search works, and tell me the local URLs. Do not delete local data unless I explicitly ask.
+You are in the MemoryOS repository. Read README.md and docs/QUICKSTART.md, then run scripts/install_memoryos.sh. Verify the backend at http://127.0.0.1:8765/health and the web UI at http://127.0.0.1:5173. Do not delete local data unless I explicitly ask.
 ```
 
 If the agent is outside the repo, include the folder path:
@@ -55,6 +98,8 @@ If you already have it, open a terminal in the folder that contains `README.md`.
 
 ## 2. Install Python Dependencies
 
+Skip this section if you already used `scripts/install_memoryos.sh`.
+
 ```sh
 python3 -m venv .venv
 source .venv/bin/activate
@@ -63,6 +108,12 @@ python3 -m pip install -r backend/requirements.txt
 ```
 
 This installs the backend plus the local search dependencies. The first run uses TF-IDF search, which works without training a model.
+
+For optional sentence-transformer/FAISS search or training tools:
+
+```sh
+python3 -m pip install -r ml/requirements.txt
+```
 
 ## 3. Start The Backend
 

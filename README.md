@@ -23,6 +23,26 @@ The short version: run MemoryOS locally, collect a small amount of context, buil
 
 ## Quick Start
 
+One-command macOS install from the repo root:
+
+```sh
+scripts/install_memoryos.sh
+```
+
+That command creates the Python virtual environment, installs backend and web dependencies, builds the React UI, installs/starts Ollama, pulls the local `mistral` model if needed, builds the Swift daemon/menu bar app, registers launch agents, and starts MemoryOS on login.
+
+The default install uses the lightweight TF-IDF search runtime. Install the heavier sentence-transformer/FAISS extras only if you want embedding search or model training:
+
+```sh
+scripts/install_memoryos.sh --with-embeddings
+```
+
+Fast install without the local LLM download:
+
+```sh
+scripts/install_memoryos.sh --skip-model-pull
+```
+
 The full beginner-friendly setup guide is here:
 
 [docs/QUICKSTART.md](docs/QUICKSTART.md)
@@ -31,7 +51,7 @@ For a tab-by-tab explanation of the web app, see:
 
 [docs/WEB_UI_GUIDE.md](docs/WEB_UI_GUIDE.md)
 
-Fast path if you already know the tooling:
+Manual backend path if you already know the tooling:
 
 ```sh
 python3 -m venv .venv
@@ -200,6 +220,7 @@ All planned prototype phases are implemented for local development:
 | 4 | Web Interface | Complete |
 | 5 | Mac Menu Bar App | Complete |
 | 6 | Polish & Deploy | Complete |
+| 7 | Local User Model | Complete |
 
 Remaining real-world work includes training production models on real labeled data, app signing/notarization, and additional permission onboarding.
 

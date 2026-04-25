@@ -6,7 +6,9 @@ PLIST="$HOME/Library/LaunchAgents/com.memoryos.daemon.plist"
 LOG_DIR="$ROOT/.logs"
 DAEMON="$ROOT/daemon/.build/memoryos-daemon"
 
-"$ROOT/scripts/build_daemon.sh"
+if [[ "${MEMORYOS_SKIP_BUILD:-0}" != "1" || ! -x "$DAEMON" ]]; then
+  "$ROOT/scripts/build_daemon.sh"
+fi
 mkdir -p "$HOME/Library/LaunchAgents" "$LOG_DIR"
 
 cat > "$PLIST" <<PLIST
