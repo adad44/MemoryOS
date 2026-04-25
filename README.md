@@ -13,8 +13,8 @@ The short version: run MemoryOS locally, collect a small amount of context, buil
 
 ## What You Get
 
-- Local FastAPI backend for capture ingest, search, stats, smart collections, weekly digest, todos, privacy settings, export, and delete.
-- React web UI for search, recent captures, pinned memories, smart collections, weekly digest, todos, batch labeling, stats, and settings.
+- Local FastAPI backend for capture ingest, search, stats, smart collections, weekly digest, todos, local user model, privacy settings, export, and delete.
+- React web UI for search, recent captures, pinned memories, smart collections, weekly digest, todos, the You user-model tab, batch labeling, stats, and settings.
 - Chrome extension for browser-page capture.
 - Swift macOS daemon for native window/file context capture.
 - Swift menu bar app for status, opening the UI, refreshing the index, and pausing capture.
@@ -83,8 +83,9 @@ For this local checkout, the path is usually the folder that contains this READM
 6. Pin high-value results from Search.
 7. Review Collections and Digest to see what MemoryOS thinks matters.
 8. Add follow-ups in Todo.
-9. Use the Label tab to batch-mark visible captures as Keep or Noise.
-10. Use Settings to manage privacy lists, storage policy, export JSON, or delete filtered captures.
+9. Open You to inspect the local user model when Ollama is running.
+10. Use the Label tab to batch-mark visible captures as Keep or Noise.
+11. Use Settings to manage privacy lists, storage policy, export JSON, or delete filtered captures.
 
 ## Storage Management
 
@@ -216,3 +217,4 @@ Remaining real-world work includes training production models on real labeled da
 - [Phase 4 notes](docs/PHASE4.md)
 - [Phase 5 notes](docs/PHASE5.md)
 - [Phase 6 notes](docs/PHASE6.md)
+- [Phase 7 notes](docs/PHASE7.md)

@@ -159,8 +159,24 @@ Use the web UI to manage memories after search starts working:
 - Open Collections to browse automatic groups like Pinned, Papers and Research, Coding and Debugging, Notes and Documents, and Career and Work.
 - Open Digest for a weekly summary of captures, opened search results, pinned memories, source breakdowns, and active todos.
 - Open Todo to add follow-up tasks such as `review transformer paper` or `finish debugging train.py`.
+- Open You to inspect the local user model after Ollama is installed and running.
 
 These features are local-first. They use the same SQLite database as captures and do not require a cloud account.
+
+Optional local user model setup:
+
+```sh
+ollama pull mistral
+ollama serve
+python3 backend/db_phase7.py
+python3 backend/abstraction_engine.py
+```
+
+For the 6-hour scheduler:
+
+```sh
+scripts/start_scheduler.sh
+```
 
 ## 9. Label Captures The Easy Way
 

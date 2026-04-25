@@ -134,6 +134,44 @@ export type TodoItem = {
   updated_at: string;
 };
 
+export type UserModelData = {
+  status: 'ready' | 'no_model';
+  summary: string;
+  top_interests: string[];
+  active_projects: string[];
+  work_rhythm: string;
+  knowledge_gaps: string[];
+  generated_at: string | null;
+  message?: string | null;
+};
+
+export type Belief = {
+  topic: string;
+  belief_type: 'interest' | 'knowledge' | 'gap' | 'pattern' | 'project';
+  summary: string;
+  confidence: number;
+  depth: 'surface' | 'familiar' | 'intermediate' | 'deep' | null;
+  times_reinforced: number;
+  last_updated: string | null;
+};
+
+export type AbstractionRun = {
+  id: number;
+  started_at: string;
+  finished_at: string | null;
+  captures_read: number;
+  beliefs_written: number;
+  beliefs_updated: number;
+  status: 'running' | 'complete' | 'failed';
+  error: string | null;
+};
+
+export type AbstractionStatus = {
+  ollama_running: boolean;
+  model: string;
+  running: boolean;
+};
+
 export type ClientConfig = {
   baseUrl: string;
   apiKey: string;
@@ -275,6 +313,19 @@ export const api = {
     }),
   deleteTodo: (config: ClientConfig, todoId: number) =>
     request<void>(config, `/todos/${todoId}?confirm=true`, { method: 'DELETE' }),
+  userModel: (config: ClientConfig) => request<UserModelData>(config, '/user-model'),
+  beliefs: (config: ClientConfig, beliefType = '', minConfidence = 0, limit = 100) => {
+    const params = new URLSearchParams({ min_confidence: String(minConfidence), limit: String(limit) });
+    if (beliefType) params.set('belief_type', beliefType);
+    return request<{ count: number; beliefs: Belief[] }>(config, `/beliefs?${params.toString()}`);
+  },
+  deleteBelief: (config: ClientConfig, topic: string) =>
+    request<void>(config, `/beliefs/${encodeURIComponent(topic)}?confirm=true`, { method: 'DELETE' }),
+  runAbstraction: (config: ClientConfig) =>
+    request<{ status: string; message: string }>(config, '/run-abstraction', { method: 'POST' }),
+  abstractionRuns: (config: ClientConfig, limit = 10) =>
+    request<{ count: number; runs: AbstractionRun[] }>(config, `/abstraction-runs?limit=${limit}`),
+  abstractionStatus: (config: ClientConfig) => request<AbstractionStatus>(config, '/abstraction-status'),
   exportData: (config: ClientConfig) => request<unknown>(config, '/export'),
   forget: (
     config: ClientConfig,

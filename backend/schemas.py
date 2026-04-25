@@ -144,6 +144,59 @@ class TodoUpdateRequest(BaseModel):
     source_capture_id: Optional[int] = None
 
 
+class UserModelResponse(BaseModel):
+    status: str = "ready"
+    summary: str = ""
+    top_interests: List[str] = Field(default_factory=list)
+    active_projects: List[str] = Field(default_factory=list)
+    work_rhythm: str = ""
+    knowledge_gaps: List[str] = Field(default_factory=list)
+    generated_at: Optional[str] = None
+    message: Optional[str] = None
+
+
+class BeliefItem(BaseModel):
+    topic: str
+    belief_type: str
+    summary: str
+    confidence: float
+    depth: Optional[str] = None
+    times_reinforced: int
+    last_updated: Optional[str] = None
+
+
+class BeliefListResponse(BaseModel):
+    count: int
+    beliefs: List[BeliefItem]
+
+
+class RunAbstractionResponse(BaseModel):
+    status: str
+    message: str
+
+
+class AbstractionRunItem(BaseModel):
+    id: int
+    started_at: str
+    finished_at: Optional[str] = None
+    captures_read: int
+    beliefs_written: int
+    beliefs_updated: int
+    status: str
+    error: Optional[str] = None
+
+
+class AbstractionRunsResponse(BaseModel):
+    count: int
+    runs: List[AbstractionRunItem]
+
+
+class AbstractionStatusResponse(BaseModel):
+    ollama_running: bool
+    model: str
+    running: bool
+
+
 class PrivacySettings(BaseModel):
     blocked_apps: List[str] = []
     blocked_domains: List[str] = []

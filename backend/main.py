@@ -9,6 +9,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import load_settings
 from .schemas import (
+    AbstractionRunsResponse,
+    AbstractionStatusResponse,
+    BeliefListResponse,
     BrowserCaptureRequest,
     BulkNoiseLabelRequest,
     BulkNoiseLabelResponse,
@@ -36,6 +39,8 @@ from .schemas import (
     TodoItem,
     TodoListResponse,
     TodoUpdateRequest,
+    RunAbstractionResponse,
+    UserModelResponse,
     WeeklyDigestResponse,
 )
 from .security import require_api_key
@@ -64,6 +69,14 @@ from .service import (
     update_capture_noise_labels,
     update_todo,
     weekly_digest,
+)
+from .user_model_service import (
+    abstraction_runs,
+    abstraction_status,
+    delete_belief,
+    latest_user_model,
+    list_beliefs,
+    trigger_abstraction_background,
 )
 
 
@@ -255,6 +268,55 @@ def delete_todo_endpoint(todo_id: int, confirm: bool = False) -> Response:
     if not delete_todo(todo_id):
         raise HTTPException(status_code=404, detail="Todo not found.")
     return Response(status_code=204)
+
+
+@app.get("/user-model", response_model=UserModelResponse, dependencies=[Depends(require_api_key)])
+def user_model_endpoint() -> UserModelResponse:
+    model = latest_user_model()
+    if not model:
+        return UserModelResponse(status="no_model", message="Run abstraction engine first")
+    return UserModelResponse(**model)
+
+
+@app.get("/beliefs", response_model=BeliefListResponse, dependencies=[Depends(require_api_key)])
+def beliefs_endpoint(
+    belief_type: Optional[str] = None,
+    min_confidence: float = Query(default=0.0, ge=0.0, le=1.0),
+    limit: int = Query(default=50, ge=1, le=200),
+) -> BeliefListResponse:
+    try:
+        beliefs = list_beliefs(belief_type=belief_type, min_confidence=min_confidence, limit=limit)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return BeliefListResponse(count=len(beliefs), beliefs=beliefs)
+
+
+@app.delete("/beliefs/{topic}", dependencies=[Depends(require_api_key)])
+def delete_belief_endpoint(topic: str, confirm: bool = False) -> Response:
+    if not confirm:
+        raise HTTPException(status_code=400, detail="Set confirm=true before deleting a belief.")
+    if not delete_belief(topic):
+        raise HTTPException(status_code=404, detail="Belief not found.")
+    return Response(status_code=204)
+
+
+@app.post("/run-abstraction", response_model=RunAbstractionResponse, dependencies=[Depends(require_api_key)])
+def run_abstraction_endpoint() -> RunAbstractionResponse:
+    started = trigger_abstraction_background()
+    if not started:
+        return RunAbstractionResponse(status="already_running", message="Abstraction engine is already running.")
+    return RunAbstractionResponse(status="started", message="Abstraction engine running in background.")
+
+
+@app.get("/abstraction-runs", response_model=AbstractionRunsResponse, dependencies=[Depends(require_api_key)])
+def abstraction_runs_endpoint(limit: int = Query(default=10, ge=1, le=100)) -> AbstractionRunsResponse:
+    runs = abstraction_runs(limit=limit)
+    return AbstractionRunsResponse(count=len(runs), runs=runs)
+
+
+@app.get("/abstraction-status", response_model=AbstractionStatusResponse, dependencies=[Depends(require_api_key)])
+def abstraction_status_endpoint() -> AbstractionStatusResponse:
+    return AbstractionStatusResponse(**abstraction_status())
 
 
 @app.get("/privacy", response_model=PrivacySettings, dependencies=[Depends(require_api_key)])

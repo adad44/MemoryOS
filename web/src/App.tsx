@@ -25,6 +25,7 @@ import {
   ShieldCheck,
   Tag,
   Trash2,
+  UserRound,
   X,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -42,8 +43,9 @@ import {
   TodoItem,
   WeeklyDigest,
 } from './api';
+import UserModel from './UserModel';
 
-type Tab = 'home' | 'search' | 'recent' | 'collections' | 'digest' | 'todo' | 'label' | 'stats' | 'settings';
+type Tab = 'home' | 'search' | 'recent' | 'you' | 'collections' | 'digest' | 'todo' | 'label' | 'stats' | 'settings';
 
 const DEFAULT_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8765';
 
@@ -51,6 +53,7 @@ const tabs: Array<{ id: Tab; label: string; icon: typeof Search }> = [
   { id: 'home', label: 'Home', icon: BrainCircuit },
   { id: 'search', label: 'Search', icon: Search },
   { id: 'recent', label: 'Recent', icon: FileText },
+  { id: 'you', label: 'You', icon: UserRound },
   { id: 'collections', label: 'Collections', icon: Layers3 },
   { id: 'digest', label: 'Digest', icon: CalendarDays },
   { id: 'todo', label: 'Todo', icon: ClipboardList },
@@ -259,6 +262,7 @@ export function App() {
           )}
           {tab === 'search' && <SearchView config={config} onError={setError} />}
           {tab === 'recent' && <RecentView config={config} onError={setError} />}
+          {tab === 'you' && <UserModel config={config} onError={setError} onToast={setToast} />}
           {tab === 'collections' && <CollectionsView config={config} onError={setError} />}
           {tab === 'digest' && <DigestView config={config} onError={setError} />}
           {tab === 'todo' && <TodoView config={config} onError={setError} onToast={setToast} />}
@@ -350,6 +354,10 @@ function HomeView({
             <button className="home-link" onClick={() => onNavigate('collections')} type="button">
               <Layers3 size={17} />
               Smart collections
+            </button>
+            <button className="home-link" onClick={() => onNavigate('you')} type="button">
+              <UserRound size={17} />
+              User model
             </button>
             <button className="home-link" onClick={() => onNavigate('digest')} type="button">
               <CalendarDays size={17} />

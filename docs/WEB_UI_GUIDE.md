@@ -102,6 +102,23 @@ Use Todo for simple follow-up tasks connected to memory work.
 
 Todos are stored locally in SQLite. They are separate from capture labels, so a user can track follow-ups without changing whether a capture is Keep or Noise.
 
+## You
+
+Use You to inspect the local user model generated from recent non-noise captures.
+
+- **Ollama status**: shows whether the local Ollama API is reachable.
+- **Model**: shows the configured local model, default `mistral`.
+- **Run Now**: starts belief extraction in the background.
+- **Current Model**: the latest plain-English summary generated from local beliefs.
+- **Top Interests**: recurring topics the user appears to care about.
+- **Active Projects**: project-like work detected from captures.
+- **Knowledge Gaps**: topics the user engages with superficially or repeatedly.
+- **Beliefs**: structured records grouped as interest, knowledge, gap, pattern, or project.
+- **Delete belief**: removes an incorrect belief after confirmation.
+- **Abstraction Runs**: recent extraction history, including failed runs.
+
+The You tab requires Ollama to be installed and running locally. No capture text is sent to a hosted service by this feature.
+
 ## Label
 
 Use Label to train MemoryOS on what is useful versus junk.
