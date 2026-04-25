@@ -26,6 +26,7 @@ class CaptureResult(BaseModel):
     url: Optional[str] = None
     file_path: Optional[str] = None
     is_noise: Optional[int] = None
+    is_pinned: int = 0
 
 
 class SearchResponse(BaseModel):
@@ -73,6 +74,74 @@ class BulkNoiseLabelRequest(BaseModel):
 
 class BulkNoiseLabelResponse(BaseModel):
     updated_count: int
+
+
+class PinRequest(BaseModel):
+    is_pinned: bool
+
+
+class CollectionSummary(BaseModel):
+    id: str
+    name: str
+    description: str
+    count: int
+    latest_capture_at: Optional[str] = None
+    captures: List[CaptureResult] = Field(default_factory=list)
+
+
+class CollectionsResponse(BaseModel):
+    count: int
+    collections: List[CollectionSummary]
+
+
+class WeeklyDigestResponse(BaseModel):
+    from_timestamp: str
+    to_timestamp: str
+    capture_count: int
+    keep_count: int
+    noise_count: int
+    pinned_count: int
+    opened_count: int
+    open_todo_count: int
+    top_apps: List[Dict[str, Any]]
+    top_sources: List[Dict[str, Any]]
+    collections: List[CollectionSummary]
+    pinned_captures: List[CaptureResult]
+    opened_captures: List[CaptureResult]
+
+
+class TodoItem(BaseModel):
+    id: int
+    title: str
+    notes: Optional[str] = None
+    status: str
+    priority: int
+    due_at: Optional[str] = None
+    source_capture_id: Optional[int] = None
+    created_at: str
+    updated_at: str
+
+
+class TodoListResponse(BaseModel):
+    count: int
+    todos: List[TodoItem]
+
+
+class TodoCreateRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=300)
+    notes: Optional[str] = Field(default=None, max_length=2_000)
+    priority: int = Field(default=2, ge=1, le=3)
+    due_at: Optional[str] = None
+    source_capture_id: Optional[int] = None
+
+
+class TodoUpdateRequest(BaseModel):
+    title: Optional[str] = Field(default=None, min_length=1, max_length=300)
+    notes: Optional[str] = Field(default=None, max_length=2_000)
+    status: Optional[str] = None
+    priority: Optional[int] = Field(default=None, ge=1, le=3)
+    due_at: Optional[str] = None
+    source_capture_id: Optional[int] = None
 
 
 class PrivacySettings(BaseModel):

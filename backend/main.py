@@ -14,6 +14,7 @@ from .schemas import (
     BulkNoiseLabelResponse,
     CleanupRequest,
     CleanupResponse,
+    CollectionsResponse,
     ExportResponse,
     ForgetRequest,
     ForgetResponse,
@@ -21,6 +22,7 @@ from .schemas import (
     NoiseLabelRequest,
     OpenCaptureRequest,
     OpenCaptureResponse,
+    PinRequest,
     PrivacySettings,
     RecentResponse,
     RefreshRequest,
@@ -30,26 +32,38 @@ from .schemas import (
     StatsResponse,
     StoragePolicy,
     StorageStatsResponse,
+    TodoCreateRequest,
+    TodoItem,
+    TodoListResponse,
+    TodoUpdateRequest,
+    WeeklyDigestResponse,
 )
 from .security import require_api_key
 from .service import (
     insert_browser_capture,
     cleanup_storage,
+    create_todo,
+    delete_todo,
     export_data,
     forget_captures,
     get_privacy_settings,
     get_storage_policy,
     log_search_click,
+    list_todos,
     open_capture,
     recent,
     refresh_index,
     save_privacy_settings,
     save_storage_policy,
     search,
+    smart_collections,
     stats,
     storage_stats,
+    update_capture_pin,
     update_capture_noise_label,
     update_capture_noise_labels,
+    update_todo,
+    weekly_digest,
 )
 
 
@@ -66,7 +80,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=list(settings.cors_origins),
     allow_credentials=False,
-    allow_methods=["GET", "POST", "PATCH", "PUT"],
+    allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE"],
     allow_headers=["Content-Type", "X-MemoryOS-API-Key"],
 )
 
@@ -175,6 +189,72 @@ def bulk_label_capture_endpoint(request: BulkNoiseLabelRequest) -> BulkNoiseLabe
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return BulkNoiseLabelResponse(updated_count=updated)
+
+
+@app.patch("/captures/{capture_id}/pin", dependencies=[Depends(require_api_key)])
+def pin_capture_endpoint(capture_id: int, request: PinRequest) -> Response:
+    found = update_capture_pin(capture_id, request.is_pinned)
+    if not found:
+        raise HTTPException(status_code=404, detail="Capture not found.")
+    return Response(status_code=204)
+
+
+@app.get("/collections", response_model=CollectionsResponse, dependencies=[Depends(require_api_key)])
+def collections_endpoint() -> CollectionsResponse:
+    collections = smart_collections()
+    return CollectionsResponse(count=len(collections), collections=collections)
+
+
+@app.get("/digest/weekly", response_model=WeeklyDigestResponse, dependencies=[Depends(require_api_key)])
+def weekly_digest_endpoint() -> WeeklyDigestResponse:
+    return WeeklyDigestResponse(**weekly_digest())
+
+
+@app.get("/todos", response_model=TodoListResponse, dependencies=[Depends(require_api_key)])
+def todos_endpoint(status: Optional[str] = None) -> TodoListResponse:
+    if status is not None and status not in {"open", "done"}:
+        raise HTTPException(status_code=422, detail="status must be open or done")
+    todos = list_todos(status=status)
+    return TodoListResponse(count=len(todos), todos=todos)
+
+
+@app.post("/todos", response_model=TodoItem, dependencies=[Depends(require_api_key)])
+def create_todo_endpoint(request: TodoCreateRequest) -> TodoItem:
+    return create_todo(
+        title=request.title,
+        notes=request.notes,
+        priority=request.priority,
+        due_at=request.due_at,
+        source_capture_id=request.source_capture_id,
+    )
+
+
+@app.patch("/todos/{todo_id}", response_model=TodoItem, dependencies=[Depends(require_api_key)])
+def update_todo_endpoint(todo_id: int, request: TodoUpdateRequest) -> TodoItem:
+    try:
+        todo = update_todo(
+            todo_id,
+            title=request.title,
+            notes=request.notes,
+            status=request.status,
+            priority=request.priority,
+            due_at=request.due_at,
+            source_capture_id=request.source_capture_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if todo is None:
+        raise HTTPException(status_code=404, detail="Todo not found.")
+    return todo
+
+
+@app.delete("/todos/{todo_id}", dependencies=[Depends(require_api_key)])
+def delete_todo_endpoint(todo_id: int, confirm: bool = False) -> Response:
+    if not confirm:
+        raise HTTPException(status_code=400, detail="Set confirm=true before deleting a todo.")
+    if not delete_todo(todo_id):
+        raise HTTPException(status_code=404, detail="Todo not found.")
+    return Response(status_code=204)
 
 
 @app.get("/privacy", response_model=PrivacySettings, dependencies=[Depends(require_api_key)])

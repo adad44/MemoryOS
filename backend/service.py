@@ -30,9 +30,11 @@ from memoryos.index import (
 from memoryos.reranker import rerank_hits
 
 from .schemas import CaptureResult
+from .schemas import CollectionSummary
 from .schemas import CleanupResponse
 from .schemas import PrivacySettings
 from .schemas import StoragePolicy
+from .schemas import TodoItem
 
 
 def row_to_capture_result(
@@ -58,6 +60,7 @@ def row_to_capture_result(
         url=row["url"],
         file_path=row["file_path"],
         is_noise=row["is_noise"],
+        is_pinned=int(row["is_pinned"] or 0),
     )
 
 
@@ -91,6 +94,7 @@ def _log_size_bytes() -> int:
 
 def _protected_capture_ids(conn: sqlite3.Connection, policy: StoragePolicy) -> set[int]:
     protected: set[int] = set()
+    protected.update(int(row["id"]) for row in conn.execute("SELECT id FROM captures WHERE is_pinned = 1"))
     if policy.protect_keep_labels:
         protected.update(int(row["id"]) for row in conn.execute("SELECT id FROM captures WHERE is_noise = 0"))
     if policy.keep_clicked:
@@ -384,6 +388,235 @@ def update_capture_noise_labels(capture_ids: list[int], is_noise: Optional[int])
         )
         conn.commit()
         return int(cursor.rowcount)
+
+
+def update_capture_pin(capture_id: int, is_pinned: bool) -> bool:
+    with connect() as conn:
+        cursor = conn.execute(
+            "UPDATE captures SET is_pinned = ? WHERE id = ?",
+            (1 if is_pinned else 0, capture_id),
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+
+
+COLLECTION_DEFINITIONS = [
+    {
+        "id": "pinned",
+        "name": "Pinned",
+        "description": "Memories the user explicitly pinned.",
+        "where": "is_pinned = 1",
+        "params": [],
+    },
+    {
+        "id": "papers-research",
+        "name": "Papers and Research",
+        "description": "Papers, arXiv pages, lectures, and research notes.",
+        "where": "(LOWER(COALESCE(url, '') || ' ' || COALESCE(window_title, '') || ' ' || content) LIKE ? OR LOWER(COALESCE(url, '') || ' ' || COALESCE(window_title, '') || ' ' || content) LIKE ? OR LOWER(COALESCE(url, '') || ' ' || COALESCE(window_title, '') || ' ' || content) LIKE ? OR LOWER(COALESCE(url, '') || ' ' || COALESCE(window_title, '') || ' ' || content) LIKE ?)",
+        "params": ["%arxiv%", "%paper%", "%lecture%", "%research%"],
+    },
+    {
+        "id": "coding-debugging",
+        "name": "Coding and Debugging",
+        "description": "Code, errors, training loops, traces, and implementation work.",
+        "where": "(LOWER(COALESCE(window_title, '') || ' ' || content || ' ' || COALESCE(file_path, '')) LIKE ? OR LOWER(COALESCE(window_title, '') || ' ' || content || ' ' || COALESCE(file_path, '')) LIKE ? OR LOWER(COALESCE(window_title, '') || ' ' || content || ' ' || COALESCE(file_path, '')) LIKE ? OR LOWER(COALESCE(window_title, '') || ' ' || content || ' ' || COALESCE(file_path, '')) LIKE ?)",
+        "params": ["%python%", "%debug%", "%traceback%", "%train%"],
+    },
+    {
+        "id": "notes-documents",
+        "name": "Notes and Documents",
+        "description": "Local documents, Notion-style notes, PDFs, and markdown files.",
+        "where": "(source_type = 'file' OR LOWER(app_name || ' ' || COALESCE(window_title, '') || ' ' || COALESCE(file_path, '')) LIKE ? OR LOWER(COALESCE(file_path, '')) LIKE ? OR LOWER(COALESCE(file_path, '')) LIKE ?)",
+        "params": ["%notion%", "%.pdf%", "%.md%"],
+    },
+    {
+        "id": "career-work",
+        "name": "Career and Job Search",
+        "description": "Resume, internship, LinkedIn, and application-related memories.",
+        "where": "(LOWER(COALESCE(url, '') || ' ' || COALESCE(window_title, '') || ' ' || content) LIKE ? OR LOWER(COALESCE(url, '') || ' ' || COALESCE(window_title, '') || ' ' || content) LIKE ? OR LOWER(COALESCE(url, '') || ' ' || COALESCE(window_title, '') || ' ' || content) LIKE ? OR LOWER(COALESCE(url, '') || ' ' || COALESCE(window_title, '') || ' ' || content) LIKE ?)",
+        "params": ["%resume%", "%linkedin%", "%internship%", "%application%"],
+    },
+]
+
+
+def smart_collections(limit_per_collection: int = 5) -> list[CollectionSummary]:
+    collections: list[CollectionSummary] = []
+    with connect() as conn:
+        for definition in COLLECTION_DEFINITIONS:
+            where = f"({definition['where']}) AND (is_noise = 0 OR is_noise IS NULL)"
+            params = list(definition["params"])
+            count_row = conn.execute(
+                f"SELECT COUNT(*) AS count, MAX(timestamp) AS latest FROM captures WHERE {where}",
+                params,
+            ).fetchone()
+            count = int(count_row["count"] or 0)
+            if count == 0:
+                continue
+            rows = conn.execute(
+                f"SELECT {CAPTURE_COLUMNS} FROM captures WHERE {where} ORDER BY is_pinned DESC, timestamp DESC LIMIT ?",
+                [*params, limit_per_collection],
+            ).fetchall()
+            collections.append(
+                CollectionSummary(
+                    id=str(definition["id"]),
+                    name=str(definition["name"]),
+                    description=str(definition["description"]),
+                    count=count,
+                    latest_capture_at=count_row["latest"],
+                    captures=[row_to_capture_result(row) for row in rows],
+                )
+            )
+    return collections
+
+
+def weekly_digest() -> dict:
+    now = datetime.now(timezone.utc)
+    start = now - timedelta(days=7)
+    start_iso = start.isoformat()
+    now_iso = now.isoformat()
+    with connect() as conn:
+        capture_count = int(conn.execute("SELECT COUNT(*) AS count FROM captures WHERE timestamp >= ?", (start_iso,)).fetchone()["count"])
+        keep_count = int(conn.execute("SELECT COUNT(*) AS count FROM captures WHERE timestamp >= ? AND is_noise = 0", (start_iso,)).fetchone()["count"])
+        noise_count = int(conn.execute("SELECT COUNT(*) AS count FROM captures WHERE timestamp >= ? AND is_noise = 1", (start_iso,)).fetchone()["count"])
+        pinned_count = int(conn.execute("SELECT COUNT(*) AS count FROM captures WHERE timestamp >= ? AND is_pinned = 1", (start_iso,)).fetchone()["count"])
+        opened_count = int(conn.execute("SELECT COUNT(*) AS count FROM search_clicks WHERE clicked_at >= ?", (start_iso,)).fetchone()["count"])
+        open_todo_count = int(conn.execute("SELECT COUNT(*) AS count FROM todos WHERE status = 'open'").fetchone()["count"])
+        top_apps = [dict(row) for row in conn.execute(
+            """
+            SELECT app_name, COUNT(*) AS count
+            FROM captures
+            WHERE timestamp >= ?
+            GROUP BY app_name
+            ORDER BY count DESC
+            LIMIT 8
+            """,
+            (start_iso,),
+        )]
+        top_sources = [dict(row) for row in conn.execute(
+            """
+            SELECT source_type, COUNT(*) AS count
+            FROM captures
+            WHERE timestamp >= ?
+            GROUP BY source_type
+            ORDER BY count DESC
+            """,
+            (start_iso,),
+        )]
+        pinned_rows = conn.execute(
+            f"SELECT {CAPTURE_COLUMNS} FROM captures WHERE is_pinned = 1 ORDER BY timestamp DESC LIMIT 8"
+        ).fetchall()
+        opened_rows = conn.execute(
+            """
+            SELECT DISTINCT
+              captures.id AS id,
+              captures.timestamp AS timestamp,
+              captures.app_name AS app_name,
+              captures.window_title AS window_title,
+              captures.content AS content,
+              captures.source_type AS source_type,
+              captures.url AS url,
+              captures.file_path AS file_path,
+              captures.is_noise AS is_noise,
+              captures.is_pinned AS is_pinned
+            FROM captures
+            JOIN search_clicks ON search_clicks.capture_id = captures.id
+            WHERE search_clicks.clicked_at >= ?
+            ORDER BY search_clicks.clicked_at DESC
+            LIMIT 8
+            """,
+            (start_iso,),
+        ).fetchall()
+    return {
+        "from_timestamp": start_iso,
+        "to_timestamp": now_iso,
+        "capture_count": capture_count,
+        "keep_count": keep_count,
+        "noise_count": noise_count,
+        "pinned_count": pinned_count,
+        "opened_count": opened_count,
+        "open_todo_count": open_todo_count,
+        "top_apps": top_apps,
+        "top_sources": top_sources,
+        "collections": smart_collections(limit_per_collection=3),
+        "pinned_captures": [row_to_capture_result(row) for row in pinned_rows],
+        "opened_captures": [row_to_capture_result(row) for row in opened_rows],
+    }
+
+
+def row_to_todo(row: sqlite3.Row) -> TodoItem:
+    return TodoItem(
+        id=int(row["id"]),
+        title=str(row["title"]),
+        notes=row["notes"],
+        status=str(row["status"]),
+        priority=int(row["priority"]),
+        due_at=row["due_at"],
+        source_capture_id=row["source_capture_id"],
+        created_at=str(row["created_at"]),
+        updated_at=str(row["updated_at"]),
+    )
+
+
+def list_todos(status: Optional[str] = None) -> list[TodoItem]:
+    where = []
+    params: list[object] = []
+    if status:
+        where.append("status = ?")
+        params.append(status)
+    sql = "SELECT * FROM todos"
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " ORDER BY status ASC, priority ASC, COALESCE(due_at, '9999-12-31') ASC, created_at DESC"
+    with connect() as conn:
+        rows = conn.execute(sql, params).fetchall()
+    return [row_to_todo(row) for row in rows]
+
+
+def create_todo(
+    title: str,
+    notes: Optional[str],
+    priority: int,
+    due_at: Optional[str],
+    source_capture_id: Optional[int],
+) -> TodoItem:
+    now = datetime.now(timezone.utc).isoformat()
+    with connect() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO todos (title, notes, priority, due_at, source_capture_id, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (title.strip(), notes, priority, due_at, source_capture_id, now, now),
+        )
+        conn.commit()
+        row = conn.execute("SELECT * FROM todos WHERE id = ?", (cursor.lastrowid,)).fetchone()
+    return row_to_todo(row)
+
+
+def update_todo(todo_id: int, **updates) -> Optional[TodoItem]:
+    allowed = ["title", "notes", "status", "priority", "due_at", "source_capture_id"]
+    values = {key: value for key, value in updates.items() if key in allowed and value is not None}
+    if "status" in values and values["status"] not in {"open", "done"}:
+        raise ValueError("status must be open or done.")
+    if not values:
+        with connect() as conn:
+            row = conn.execute("SELECT * FROM todos WHERE id = ?", (todo_id,)).fetchone()
+        return row_to_todo(row) if row else None
+    values["updated_at"] = datetime.now(timezone.utc).isoformat()
+    assignments = ", ".join(f"{key} = ?" for key in values)
+    params = [*values.values(), todo_id]
+    with connect() as conn:
+        conn.execute(f"UPDATE todos SET {assignments} WHERE id = ?", params)
+        conn.commit()
+        row = conn.execute("SELECT * FROM todos WHERE id = ?", (todo_id,)).fetchone()
+    return row_to_todo(row) if row else None
+
+
+def delete_todo(todo_id: int) -> bool:
+    with connect() as conn:
+        cursor = conn.execute("DELETE FROM todos WHERE id = ?", (todo_id,))
+        conn.commit()
+        return cursor.rowcount > 0
 
 
 def _privacy_path():

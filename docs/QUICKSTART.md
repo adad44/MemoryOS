@@ -151,7 +151,18 @@ Or use the Search tab in the web UI.
 
 If search returns `409`, it means the index has not been built yet. Run the Reindex step again after you have at least one capture.
 
-## 8. Label Captures The Easy Way
+## 8. Pin, Review, And Track Follow-Ups
+
+Use the web UI to manage memories after search starts working:
+
+- Open Search and click Pin on high-value memories you want protected.
+- Open Collections to browse automatic groups like Pinned, Papers and Research, Coding and Debugging, Notes and Documents, and Career and Work.
+- Open Digest for a weekly summary of captures, opened search results, pinned memories, source breakdowns, and active todos.
+- Open Todo to add follow-up tasks such as `review transformer paper` or `finish debugging train.py`.
+
+These features are local-first. They use the same SQLite database as captures and do not require a cloud account.
+
+## 9. Label Captures The Easy Way
 
 Open the Label tab in the web UI.
 
@@ -169,7 +180,7 @@ Then click:
 
 If only a few items are exceptions, select those checkboxes first. The buttons will switch to selected mode and apply only to those captures.
 
-## 9. Enable Browser Capture
+## 10. Enable Browser Capture
 
 1. Keep the backend running on `http://127.0.0.1:8765`.
 2. Open Chrome.
@@ -182,7 +193,7 @@ If only a few items are exceptions, select those checkboxes first. The buttons w
 
 The extension sends page title, URL, visible text, and timestamp to your local backend. It does not capture incognito tabs, obvious sensitive domains, very short pages, or common entertainment domains.
 
-## 10. Optional: Native macOS Capture
+## 11. Optional: Native macOS Capture
 
 Build the Swift daemon:
 
@@ -207,7 +218,7 @@ open menubar/dist/MemoryOS.app
 
 The menu bar app can open the web UI, check backend status, refresh the index, and pause or resume native capture.
 
-## 11. Manage Storage
+## 12. Manage Storage
 
 Open the Settings tab, then use the Storage panel.
 
@@ -215,7 +226,7 @@ Useful defaults:
 
 - Balanced mode keeps unprotected captures for 30 days.
 - Noise captures are deleted after 24 hours.
-- Clicked search results and captures marked Keep are protected.
+- Clicked search results, pinned captures, and captures marked Keep are protected.
 - Exact duplicates are removed during cleanup.
 - The database cap defaults to 1 GB.
 
@@ -227,7 +238,7 @@ Recommended routine:
 4. Click Clean Up.
 5. Click Clean + Reindex after large cleanups.
 
-## 12. Optional: Start At Login
+## 13. Optional: Start At Login
 
 Install login startup:
 

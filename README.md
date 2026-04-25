@@ -2,7 +2,7 @@
 
 MemoryOS is a local-first memory and search system for your computer. It captures useful context from browser pages, active macOS windows, and local files, stores that data in SQLite on your Mac, and lets you search it later through a local web app.
 
-The short version: run MemoryOS locally, collect a small amount of context, build a search index, then use the web UI to search, review, label, export, or delete your data.
+The short version: run MemoryOS locally, collect a small amount of context, build a search index, then use the web UI to search, pin, review, label, track follow-ups, export, or delete your data.
 
 ## Who This Is For
 
@@ -13,8 +13,8 @@ The short version: run MemoryOS locally, collect a small amount of context, buil
 
 ## What You Get
 
-- Local FastAPI backend for capture ingest, search, stats, privacy settings, export, and delete.
-- React web UI for search, recent captures, batch labeling, stats, and settings.
+- Local FastAPI backend for capture ingest, search, stats, smart collections, weekly digest, todos, privacy settings, export, and delete.
+- React web UI for search, recent captures, pinned memories, smart collections, weekly digest, todos, batch labeling, stats, and settings.
 - Chrome extension for browser-page capture.
 - Swift macOS daemon for native window/file context capture.
 - Swift menu bar app for status, opening the UI, refreshing the index, and pausing capture.
@@ -80,8 +80,11 @@ For this local checkout, the path is usually the folder that contains this READM
 3. Add captures through the Chrome extension, the macOS daemon, or a test API call.
 4. Open the Stats tab and click Reindex.
 5. Search from the Search tab.
-6. Use the Label tab to batch-mark visible captures as Keep or Noise.
-7. Use Settings to manage privacy lists, storage policy, export JSON, or delete filtered captures.
+6. Pin high-value results from Search.
+7. Review Collections and Digest to see what MemoryOS thinks matters.
+8. Add follow-ups in Todo.
+9. Use the Label tab to batch-mark visible captures as Keep or Noise.
+10. Use Settings to manage privacy lists, storage policy, export JSON, or delete filtered captures.
 
 ## Storage Management
 
@@ -90,9 +93,9 @@ MemoryOS is local-first, so storage matters. The web Settings tab includes a Sto
 - Database, index, log, and total disk usage.
 - Retention modes: Light, Balanced, Deep memory, and Archive.
 - Automatic cleanup for noise, old unprotected captures, exact duplicates, large databases, and oversized logs.
-- Protected captures: clicked search results and user-marked Keep rows are preserved by default.
+- Protected captures: clicked search results, pinned rows, and user-marked Keep rows are preserved by default.
 
-The default Balanced policy keeps useful captures for 30 days, deletes noise after 24 hours, protects clicked/kept memories, and caps the database at 1 GB.
+The default Balanced policy keeps useful captures for 30 days, deletes noise after 24 hours, protects clicked/pinned/kept memories, and caps the database at 1 GB.
 
 ## Privacy Model
 

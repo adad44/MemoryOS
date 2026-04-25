@@ -13,6 +13,7 @@ export type CaptureResult = {
   url: string | null;
   file_path: string | null;
   is_noise: number | null;
+  is_pinned: number;
 };
 
 export type SearchResponse = {
@@ -89,6 +90,48 @@ export type CleanupResponse = {
   index_removed: boolean;
   index_rebuilt: boolean;
   reclaimed_hint_bytes: number;
+};
+
+export type CollectionSummary = {
+  id: string;
+  name: string;
+  description: string;
+  count: number;
+  latest_capture_at: string | null;
+  captures: CaptureResult[];
+};
+
+export type CollectionsResponse = {
+  count: number;
+  collections: CollectionSummary[];
+};
+
+export type WeeklyDigest = {
+  from_timestamp: string;
+  to_timestamp: string;
+  capture_count: number;
+  keep_count: number;
+  noise_count: number;
+  pinned_count: number;
+  opened_count: number;
+  open_todo_count: number;
+  top_apps: Array<{ app_name: string; count: number }>;
+  top_sources: Array<{ source_type: string; count: number }>;
+  collections: CollectionSummary[];
+  pinned_captures: CaptureResult[];
+  opened_captures: CaptureResult[];
+};
+
+export type TodoItem = {
+  id: number;
+  title: string;
+  notes: string | null;
+  status: 'open' | 'done';
+  priority: number;
+  due_at: string | null;
+  source_capture_id: number | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type ClientConfig = {
@@ -169,6 +212,11 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify({ is_noise: isNoise }),
     }),
+  pinCapture: (config: ClientConfig, captureId: number, isPinned: boolean) =>
+    request<void>(config, `/captures/${captureId}/pin`, {
+      method: 'PATCH',
+      body: JSON.stringify({ is_pinned: isPinned }),
+    }),
   bulkLabelNoise: (config: ClientConfig, captureIds: number[], isNoise: number | null) =>
     request<{ updated_count: number }>(config, '/captures/noise/bulk', {
       method: 'PATCH',
@@ -200,6 +248,33 @@ export const api = {
         confirm: true,
       }),
     }),
+  collections: (config: ClientConfig) => request<CollectionsResponse>(config, '/collections'),
+  weeklyDigest: (config: ClientConfig) => request<WeeklyDigest>(config, '/digest/weekly'),
+  todos: (config: ClientConfig, status = '') => {
+    const params = new URLSearchParams();
+    if (status) params.set('status', status);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    return request<{ count: number; todos: TodoItem[] }>(config, `/todos${suffix}`);
+  },
+  createTodo: (
+    config: ClientConfig,
+    body: { title: string; notes?: string; priority: number; due_at?: string; source_capture_id?: number },
+  ) =>
+    request<TodoItem>(config, '/todos', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  updateTodo: (
+    config: ClientConfig,
+    todoId: number,
+    body: Partial<{ title: string; notes: string; status: 'open' | 'done'; priority: number; due_at: string; source_capture_id: number }>,
+  ) =>
+    request<TodoItem>(config, `/todos/${todoId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  deleteTodo: (config: ClientConfig, todoId: number) =>
+    request<void>(config, `/todos/${todoId}?confirm=true`, { method: 'DELETE' }),
   exportData: (config: ClientConfig) => request<unknown>(config, '/export'),
   forget: (
     config: ClientConfig,

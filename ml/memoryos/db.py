@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS captures (
   url          TEXT,
   file_path    TEXT,
   is_noise     INTEGER DEFAULT NULL,
+  is_pinned    INTEGER NOT NULL DEFAULT 0,
   embedding    BLOB
 );
 
@@ -39,15 +40,29 @@ CREATE TABLE IF NOT EXISTS search_clicks (
   FOREIGN KEY(capture_id) REFERENCES captures(id)
 );
 
+CREATE TABLE IF NOT EXISTS todos (
+  id          INTEGER PRIMARY KEY,
+  title       TEXT NOT NULL,
+  notes       TEXT,
+  status      TEXT NOT NULL DEFAULT 'open',
+  priority    INTEGER NOT NULL DEFAULT 2,
+  due_at      DATETIME,
+  source_capture_id INTEGER,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(source_capture_id) REFERENCES captures(id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_captures_timestamp ON captures(timestamp);
 CREATE INDEX IF NOT EXISTS idx_captures_app ON captures(app_name);
 CREATE INDEX IF NOT EXISTS idx_captures_noise ON captures(is_noise);
 CREATE INDEX IF NOT EXISTS idx_search_clicks_capture ON search_clicks(capture_id);
+CREATE INDEX IF NOT EXISTS idx_todos_status ON todos(status);
 """
 
 
 CAPTURE_COLUMNS = """
-id, timestamp, app_name, window_title, content, source_type, url, file_path, is_noise
+id, timestamp, app_name, window_title, content, source_type, url, file_path, is_noise, is_pinned
 """
 
 
@@ -62,13 +77,22 @@ def connect(path: Optional[Path] = None) -> sqlite3.Connection:
 
 
 def _migrate(conn: sqlite3.Connection) -> None:
-    columns = {
+    click_columns = {
         row["name"]
         for row in conn.execute("PRAGMA table_info(search_clicks)").fetchall()
     }
-    if "dwell_ms" not in columns:
+    if "dwell_ms" not in click_columns:
         conn.execute("ALTER TABLE search_clicks ADD COLUMN dwell_ms INTEGER")
         conn.commit()
+    capture_columns = {
+        row["name"]
+        for row in conn.execute("PRAGMA table_info(captures)").fetchall()
+    }
+    if "is_pinned" not in capture_columns:
+        conn.execute("ALTER TABLE captures ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0")
+        conn.commit()
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_captures_pinned ON captures(is_pinned)")
+    conn.commit()
 
 
 def capture_count(conn: sqlite3.Connection) -> int:

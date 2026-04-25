@@ -34,6 +34,7 @@ Use Search for natural-language memory retrieval.
 - **Candidates**: number of initial candidates retrieved before the top results are returned.
 - **Latency**: measured backend search time in milliseconds.
 - **Open**: opens a captured URL or file through the local backend using macOS `open`.
+- **Pin / Unpin**: protects a high-value memory and surfaces it in Collections and Digest.
 - **Similarity**: raw retrieval similarity score.
 - **Rank**: final rerank score.
 
@@ -54,6 +55,53 @@ Use Recent to inspect what MemoryOS is collecting.
 
 Recent is the fastest way to verify whether browser, file, or native macOS capture is working.
 
+## Collections
+
+Use Collections to browse important memories without typing a search query.
+
+- **Pinned**: captures the user explicitly pinned from Search results.
+- **Papers and Research**: arXiv, PDF, paper, and research-heavy captures.
+- **Coding and Debugging**: code, terminal, editor, stack trace, and training-loop context.
+- **Notes and Documents**: local files, PDFs, docs, slides, and note-taking captures.
+- **Career and Work**: resume, job, interview, email, calendar, and work-related captures.
+- **Refresh**: rebuilds the collection view from the latest local database state.
+
+Collections are computed locally from capture metadata, source type, app names, domains, and content keywords. They do not require the user to manually label every capture.
+
+## Digest
+
+Use Digest as a weekly review of what MemoryOS has collected and what the user has interacted with.
+
+- **Captures**: number of captures from the last seven days.
+- **Keep**: captures marked useful.
+- **Noise**: captures marked junk.
+- **Pinned**: captures pinned during the week.
+- **Opened**: memories opened from search results.
+- **Todos**: open items in the Todo tab.
+- **Top Apps**: apps with the most weekly captures.
+- **Sources**: capture source breakdown.
+- **Pinned This Week**: recent pinned captures.
+- **Opened From Search**: search results the user clicked back into.
+- **Active Collections**: collections with current matching captures.
+
+Digest is meant for weekly cleanup and recall: pin what matters, mark obvious junk as Noise, and turn follow-ups into Todo items.
+
+## Todo
+
+Use Todo for simple follow-up tasks connected to memory work.
+
+- **Title**: the task name.
+- **Notes**: optional detail or next step.
+- **Priority**: `1` is highest, `3` is lowest.
+- **Add Todo**: creates a local todo row.
+- **Open**: active tasks.
+- **Done**: completed tasks.
+- **Checkbox**: toggles a todo between Open and Done.
+- **Delete**: removes the todo from the local database.
+- **Refresh**: reloads todos from the backend.
+
+Todos are stored locally in SQLite. They are separate from capture labels, so a user can track follow-ups without changing whether a capture is Keep or Noise.
+
 ## Label
 
 Use Label to train MemoryOS on what is useful versus junk.
@@ -70,6 +118,8 @@ Use Label to train MemoryOS on what is useful versus junk.
 - **Clear visible / Clear selected**: removes the current label.
 
 Captures marked Noise are excluded from indexing. Captures marked Keep are protected by cleanup by default.
+
+Users do not have to manually label every capture. MemoryOS can auto-noise obvious low-value content, and unlabeled captures remain searchable unless they are filtered out by noise rules. Manual labels are for correction and storage control.
 
 ## Stats
 
@@ -161,7 +211,7 @@ Default:
 30 days
 ```
 
-Clicked captures and Keep-labeled captures are protected by default.
+Clicked captures, pinned captures, and Keep-labeled captures are protected by default.
 
 #### Noise Hours
 
@@ -262,10 +312,13 @@ For normal use:
 
 1. Leave storage mode on Balanced.
 2. Use Search and open useful results.
-3. Mark important captures as Keep.
-4. Mark obvious junk as Noise.
-5. Run Clean Up occasionally.
-6. Run Clean + Reindex after large cleanup jobs.
+3. Pin high-value memories from Search.
+4. Review Collections and Digest weekly.
+5. Add follow-ups in Todo.
+6. Mark important captures as Keep.
+7. Mark obvious junk as Noise.
+8. Run Clean Up occasionally.
+9. Run Clean + Reindex after large cleanup jobs.
 
 ## Local Data Paths
 

@@ -2,29 +2,48 @@ import {
   Activity,
   BarChart3,
   BrainCircuit,
+  CalendarDays,
   Check,
   Clock3,
   Circle,
+  ClipboardList,
   Database,
   ExternalLink,
   FileText,
   Filter,
   Gauge,
   HardDrive,
+  Layers3,
   Loader2,
+  Pin,
+  PinOff,
+  Plus,
   RefreshCw,
   Search,
   Settings,
   Shield,
   ShieldCheck,
   Tag,
+  Trash2,
   X,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
-import { api, CaptureResult, ClientConfig, PrivacySettings, SearchResponse, StatsResponse, StoragePolicy, StorageStats } from './api';
+import {
+  api,
+  CaptureResult,
+  ClientConfig,
+  CollectionSummary,
+  PrivacySettings,
+  SearchResponse,
+  StatsResponse,
+  StoragePolicy,
+  StorageStats,
+  TodoItem,
+  WeeklyDigest,
+} from './api';
 
-type Tab = 'home' | 'search' | 'recent' | 'label' | 'stats' | 'settings';
+type Tab = 'home' | 'search' | 'recent' | 'collections' | 'digest' | 'todo' | 'label' | 'stats' | 'settings';
 
 const DEFAULT_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8765';
 
@@ -32,6 +51,9 @@ const tabs: Array<{ id: Tab; label: string; icon: typeof Search }> = [
   { id: 'home', label: 'Home', icon: BrainCircuit },
   { id: 'search', label: 'Search', icon: Search },
   { id: 'recent', label: 'Recent', icon: FileText },
+  { id: 'collections', label: 'Collections', icon: Layers3 },
+  { id: 'digest', label: 'Digest', icon: CalendarDays },
+  { id: 'todo', label: 'Todo', icon: ClipboardList },
   { id: 'label', label: 'Label', icon: Tag },
   { id: 'stats', label: 'Stats', icon: BarChart3 },
   { id: 'settings', label: 'Settings', icon: Settings },
@@ -237,6 +259,9 @@ export function App() {
           )}
           {tab === 'search' && <SearchView config={config} onError={setError} />}
           {tab === 'recent' && <RecentView config={config} onError={setError} />}
+          {tab === 'collections' && <CollectionsView config={config} onError={setError} />}
+          {tab === 'digest' && <DigestView config={config} onError={setError} />}
+          {tab === 'todo' && <TodoView config={config} onError={setError} onToast={setToast} />}
           {tab === 'label' && <LabelView config={config} onError={setError} onToast={setToast} />}
           {tab === 'stats' && (
             <StatsView config={config} stats={stats} onStats={setStats} onError={setError} onToast={setToast} />
@@ -321,6 +346,18 @@ function HomeView({
             <button className="home-link" onClick={() => onNavigate('label')} type="button">
               <Check size={17} />
               Review labels
+            </button>
+            <button className="home-link" onClick={() => onNavigate('collections')} type="button">
+              <Layers3 size={17} />
+              Smart collections
+            </button>
+            <button className="home-link" onClick={() => onNavigate('digest')} type="button">
+              <CalendarDays size={17} />
+              Weekly digest
+            </button>
+            <button className="home-link" onClick={() => onNavigate('todo')} type="button">
+              <ClipboardList size={17} />
+              Todo list
             </button>
             <button className="home-link" onClick={() => onNavigate('stats')} type="button">
               <BarChart3 size={17} />
@@ -482,6 +519,302 @@ function RecentView({ config, onError }: { config: ClientConfig; onError: (value
         </button>
       </div>
       <ResultList config={config} query="" results={results} onError={onError} />
+    </div>
+  );
+}
+
+function CollectionsView({ config, onError }: { config: ClientConfig; onError: (value: string) => void }) {
+  const [collections, setCollections] = useState<CollectionSummary[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const response = await api.collections(config);
+      setCollections(response.collections);
+      onError('');
+    } catch (err) {
+      onError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void load();
+  }, [config.baseUrl, config.apiKey]);
+
+  return (
+    <div className="space-y-4">
+      <div className="toolbar">
+        <Layers3 size={18} className="text-slate-500" />
+        <div className="min-w-0 flex-1 text-sm text-slate-700">Smart collections are built from pinned captures, topics, apps, domains, and source types.</div>
+        <button className="command-button" onClick={load} type="button">
+          {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+          Refresh
+        </button>
+      </div>
+      <div className="grid gap-4">
+        {collections.map((collection) => (
+          <section className="surface" key={collection.id}>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="surface-title">{collection.name}</div>
+                <div className="mt-1 text-sm text-slate-600">{collection.description}</div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <span className="status-pill">{collection.count} captures</span>
+                <span className="status-pill">{relativeTime(collection.latest_capture_at)}</span>
+              </div>
+            </div>
+            <div className="mt-3 space-y-3">
+              {collection.captures.map((capture) => (
+                <CaptureCard key={capture.id} capture={capture} />
+              ))}
+            </div>
+          </section>
+        ))}
+        {!collections.length && <EmptyState label="No smart collections yet" />}
+      </div>
+    </div>
+  );
+}
+
+function DigestView({ config, onError }: { config: ClientConfig; onError: (value: string) => void }) {
+  const [digest, setDigest] = useState<WeeklyDigest | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      setDigest(await api.weeklyDigest(config));
+      onError('');
+    } catch (err) {
+      onError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void load();
+  }, [config.baseUrl, config.apiKey]);
+
+  return (
+    <div className="space-y-4">
+      <div className="toolbar">
+        <CalendarDays size={18} className="text-slate-500" />
+        <div className="min-w-0 flex-1 text-sm text-slate-700">
+          {digest ? `${formatTime(digest.from_timestamp)} to ${formatTime(digest.to_timestamp)}` : 'Weekly memory digest'}
+        </div>
+        <button className="command-button" onClick={load} type="button">
+          {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+          Refresh
+        </button>
+      </div>
+      <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <Metric label="Captures" value={digest?.capture_count ?? 0} icon={Database} />
+        <Metric label="Keep" value={digest?.keep_count ?? 0} icon={Check} />
+        <Metric label="Noise" value={digest?.noise_count ?? 0} icon={X} />
+        <Metric label="Pinned" value={digest?.pinned_count ?? 0} icon={Pin} />
+        <Metric label="Opened" value={digest?.opened_count ?? 0} icon={ExternalLink} />
+        <Metric label="Todos" value={digest?.open_todo_count ?? 0} icon={ClipboardList} />
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Breakdown title="Top Apps" rows={digest?.top_apps || []} labelKey="app_name" />
+        <Breakdown title="Sources" rows={digest?.top_sources || []} labelKey="source_type" />
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <section className="surface">
+          <div className="surface-title">Pinned Highlights</div>
+          <div className="mt-3 space-y-3">
+            {(digest?.pinned_captures || []).map((capture) => (
+              <CaptureCard key={capture.id} capture={capture} />
+            ))}
+            {digest && !digest.pinned_captures.length && <div className="text-sm text-slate-500">No pinned captures yet.</div>}
+          </div>
+        </section>
+        <section className="surface">
+          <div className="surface-title">Opened From Search</div>
+          <div className="mt-3 space-y-3">
+            {(digest?.opened_captures || []).map((capture) => (
+              <CaptureCard key={capture.id} capture={capture} />
+            ))}
+            {digest && !digest.opened_captures.length && <div className="text-sm text-slate-500">No opened search results this week.</div>}
+          </div>
+        </section>
+      </div>
+      <section className="surface">
+        <div className="surface-title">Active Collections</div>
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          {(digest?.collections || []).map((collection) => (
+            <div className="border border-line bg-panel p-3" key={collection.id}>
+              <div className="font-medium text-ink">{collection.name}</div>
+              <div className="mt-1 text-sm text-slate-600">{collection.count} captures</div>
+            </div>
+          ))}
+          {digest && !digest.collections.length && <div className="text-sm text-slate-500">No collection activity yet.</div>}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function TodoView({
+  config,
+  onError,
+  onToast,
+}: {
+  config: ClientConfig;
+  onError: (value: string) => void;
+  onToast: (value: string) => void;
+}) {
+  const [todos, setTodos] = useState<TodoItem[]>([]);
+  const [title, setTitle] = useState('');
+  const [notes, setNotes] = useState('');
+  const [priority, setPriority] = useState(2);
+  const [loading, setLoading] = useState(false);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const response = await api.todos(config);
+      setTodos(response.todos);
+      onError('');
+    } catch (err) {
+      onError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const addTodo = async () => {
+    if (!title.trim()) return;
+    try {
+      const created = await api.createTodo(config, {
+        title: title.trim(),
+        notes: notes.trim() || undefined,
+        priority,
+      });
+      setTodos((items) => [created, ...items]);
+      setTitle('');
+      setNotes('');
+      setPriority(2);
+      onToast('Todo added');
+      onError('');
+    } catch (err) {
+      onError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const toggleTodo = async (todo: TodoItem) => {
+    try {
+      const updated = await api.updateTodo(config, todo.id, {
+        status: todo.status === 'open' ? 'done' : 'open',
+      });
+      setTodos((items) => items.map((item) => (item.id === todo.id ? updated : item)));
+      onError('');
+    } catch (err) {
+      onError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const removeTodo = async (todo: TodoItem) => {
+    if (!window.confirm(`Delete todo "${todo.title}"?`)) return;
+    try {
+      await api.deleteTodo(config, todo.id);
+      setTodos((items) => items.filter((item) => item.id !== todo.id));
+      onToast('Todo deleted');
+      onError('');
+    } catch (err) {
+      onError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  useEffect(() => {
+    void load();
+  }, [config.baseUrl, config.apiKey]);
+
+  const openTodos = todos.filter((todo) => todo.status === 'open');
+  const doneTodos = todos.filter((todo) => todo.status === 'done');
+
+  return (
+    <div className="space-y-4">
+      <section className="surface">
+        <div className="surface-title">Add Todo</div>
+        <div className="mt-4 grid gap-3">
+          <input className="settings-input" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Task title" />
+          <textarea className="settings-area" value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Notes" />
+          <div className="flex flex-wrap gap-2">
+            <select className="compact-input" value={priority} onChange={(event) => setPriority(Number(event.target.value))}>
+              <option value={1}>High priority</option>
+              <option value={2}>Normal priority</option>
+              <option value={3}>Low priority</option>
+            </select>
+            <button className="command-button primary" onClick={addTodo} type="button">
+              <Plus size={16} />
+              Add Todo
+            </button>
+            <button className="command-button" onClick={load} type="button">
+              {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+              Refresh
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section className="surface">
+        <div className="surface-title">Open</div>
+        <div className="mt-3 space-y-2">
+          {openTodos.map((todo) => (
+            <TodoRow key={todo.id} todo={todo} onToggle={toggleTodo} onDelete={removeTodo} />
+          ))}
+          {!openTodos.length && <div className="text-sm text-slate-500">No open todos.</div>}
+        </div>
+      </section>
+
+      <section className="surface">
+        <div className="surface-title">Done</div>
+        <div className="mt-3 space-y-2">
+          {doneTodos.map((todo) => (
+            <TodoRow key={todo.id} todo={todo} onToggle={toggleTodo} onDelete={removeTodo} />
+          ))}
+          {!doneTodos.length && <div className="text-sm text-slate-500">No completed todos.</div>}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function TodoRow({
+  todo,
+  onToggle,
+  onDelete,
+}: {
+  todo: TodoItem;
+  onToggle: (todo: TodoItem) => void;
+  onDelete: (todo: TodoItem) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-3 border border-line bg-white p-3">
+      <div className="min-w-0 flex-1">
+        <div className={`font-medium ${todo.status === 'done' ? 'text-slate-500 line-through' : 'text-ink'}`}>{todo.title}</div>
+        {todo.notes && <div className="mt-1 text-sm text-slate-600">{todo.notes}</div>}
+        <div className="mt-2 flex flex-wrap gap-2">
+          <span className="status-pill">Priority {todo.priority}</span>
+          <span className="status-pill">{todo.status}</span>
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <button className="command-button" onClick={() => onToggle(todo)} type="button">
+          <Check size={16} />
+          {todo.status === 'open' ? 'Done' : 'Reopen'}
+        </button>
+        <button className="command-button danger" onClick={() => onDelete(todo)} type="button">
+          <Trash2 size={16} />
+          Delete
+        </button>
+      </div>
     </div>
   );
 }
@@ -1150,6 +1483,16 @@ function ResultList({
   resultsLoadedAt?: number | null;
   onError: (value: string) => void;
 }) {
+  const [localPins, setLocalPins] = useState<Record<number, boolean>>({});
+
+  useEffect(() => {
+    const next: Record<number, boolean> = {};
+    results.forEach((capture) => {
+      next[capture.id] = Boolean(capture.is_pinned);
+    });
+    setLocalPins(next);
+  }, [results]);
+
   const handleOpen = async (capture: CaptureResult) => {
     const dwellMs = resultsLoadedAt ? Date.now() - resultsLoadedAt : undefined;
     let openedByBackend = false;
@@ -1173,13 +1516,28 @@ function ResultList({
     }
   };
 
+  const handlePin = async (capture: CaptureResult) => {
+    const next = !(localPins[capture.id] ?? Boolean(capture.is_pinned));
+    try {
+      await api.pinCapture(config, capture.id, next);
+      setLocalPins((current) => ({ ...current, [capture.id]: next }));
+      onError('');
+    } catch (err) {
+      onError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
   if (!results.length) return <EmptyState label="No results" />;
 
   return (
     <div className="space-y-3">
       {results.map((capture) => (
-        <CaptureCard key={capture.id} capture={capture}>
+        <CaptureCard key={capture.id} capture={capture} pinned={localPins[capture.id] ?? Boolean(capture.is_pinned)}>
           <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button className="command-button" onClick={() => handlePin(capture)} type="button">
+              {(localPins[capture.id] ?? Boolean(capture.is_pinned)) ? <PinOff size={16} /> : <Pin size={16} />}
+              {(localPins[capture.id] ?? Boolean(capture.is_pinned)) ? 'Unpin' : 'Pin'}
+            </button>
             {(capture.url || capture.file_path) && (
               <button className="command-button" onClick={() => handleOpen(capture)} type="button">
                 <ExternalLink size={16} />
@@ -1198,11 +1556,14 @@ function ResultList({
 
 function CaptureCard({
   capture,
+  pinned,
   children,
 }: {
   capture: CaptureResult;
+  pinned?: boolean;
   children?: ReactNode;
 }) {
+  const isPinned = pinned ?? Boolean(capture.is_pinned);
   return (
     <article className="capture-card">
       <div className="flex min-w-0 items-start justify-between gap-3">
@@ -1212,7 +1573,15 @@ function CaptureCard({
           </h2>
           <div className="mt-1 text-sm text-slate-600">{sourceLabel(capture)}</div>
         </div>
-        <div className="shrink-0 rounded bg-slate-100 px-2 py-1 text-xs text-slate-600">#{capture.id}</div>
+        <div className="flex shrink-0 items-center gap-2">
+          {isPinned && (
+            <span className="status-pill">
+              <Pin size={13} />
+              Pinned
+            </span>
+          )}
+          <div className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-600">#{capture.id}</div>
+        </div>
       </div>
       <p className="mt-3 text-sm leading-6 text-slate-800">{capture.snippet}</p>
       {children}

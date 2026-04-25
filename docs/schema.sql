@@ -14,6 +14,9 @@ CREATE TABLE IF NOT EXISTS captures (
   is_noise     INTEGER DEFAULT NULL CHECK (
     is_noise IS NULL OR is_noise IN (0, 1)
   ),
+  is_pinned    INTEGER NOT NULL DEFAULT 0 CHECK (
+    is_pinned IN (0, 1)
+  ),
   embedding    BLOB
 );
 
@@ -35,9 +38,26 @@ CREATE TABLE IF NOT EXISTS search_clicks (
   FOREIGN KEY(capture_id) REFERENCES captures(id)
 );
 
+CREATE TABLE IF NOT EXISTS todos (
+  id          INTEGER PRIMARY KEY,
+  title       TEXT NOT NULL,
+  notes       TEXT,
+  status      TEXT NOT NULL DEFAULT 'open' CHECK (
+    status IN ('open', 'done')
+  ),
+  priority    INTEGER NOT NULL DEFAULT 2,
+  due_at      DATETIME,
+  source_capture_id INTEGER,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(source_capture_id) REFERENCES captures(id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_captures_timestamp ON captures(timestamp);
 CREATE INDEX IF NOT EXISTS idx_captures_app ON captures(app_name);
 CREATE INDEX IF NOT EXISTS idx_captures_source_type ON captures(source_type);
 CREATE INDEX IF NOT EXISTS idx_captures_noise ON captures(is_noise);
+CREATE INDEX IF NOT EXISTS idx_captures_pinned ON captures(is_pinned);
 CREATE INDEX IF NOT EXISTS idx_sessions_app ON sessions(app_name);
 CREATE INDEX IF NOT EXISTS idx_search_clicks_capture ON search_clicks(capture_id);
+CREATE INDEX IF NOT EXISTS idx_todos_status ON todos(status);
