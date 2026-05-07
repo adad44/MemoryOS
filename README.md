@@ -21,6 +21,29 @@ The short version: run MemoryOS locally, collect a small amount of context, buil
 - TF-IDF search that works immediately, plus hooks for sentence-transformer and FAISS indexing.
 - Storage controls for retention, auto-noise rules, cleanup, and protected useful captures.
 
+## Soon: MemoryOS for Teams
+
+MemoryOS is being designed to expand from personal work memory into a team and enterprise memory layer. The goal is to give every employee a private work memory while giving teams a controlled way to share approved project context with coworkers and AI agents.
+
+The full product sequence and enterprise plan live in [docs/MEMORYOS_TEAMS.md](docs/MEMORYOS_TEAMS.md).
+
+In a team setup, MemoryOS would help companies:
+
+- Keep employee AI agents, including Hermes Agent, caught up with each worker's current projects, meetings, documents, tickets, and decisions.
+- Build shared project memory from approved captures, meeting summaries, docs, chats, PRs, customer notes, and follow-ups.
+- Let teammates ask what changed, what was decided, who owns a blocker, or what context matters before a meeting without interrupting peers.
+- Help new employees ramp up through a guided memory brief with project history, active work, important decisions, and key people.
+- Preserve continuity when someone changes teams, goes on vacation, or leaves the company by keeping approved shared work context available.
+
+The enterprise version should stay private-first:
+
+- Personal work memory stays local and employee-visible by default.
+- Shared team memory only includes approved or policy-allowed context.
+- Admins can manage capture sources, app and domain exclusions, retention, redaction, access control, and audit logs.
+- Companies can connect MemoryOS to identity providers, team workspaces, project permissions, and agent access policies.
+
+The long-term direction is simple: MemoryOS becomes the memory layer for humans and workplace agents, so teams stop losing context across meetings, tools, handoffs, and daily work.
+
 ## Quick Start
 
 From a fresh Mac, use the public installer:

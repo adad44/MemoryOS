@@ -315,6 +315,52 @@
         line-height: 1.55;
       }
 
+      .teams-note {
+        margin-top: 22px;
+        border-left: 4px solid var(--teal);
+        background: #f7fbfa;
+        color: #34444f;
+        font-size: 16px;
+        font-weight: 800;
+        line-height: 1.55;
+        padding: 16px 18px;
+      }
+
+      .teams-flow {
+        display: grid;
+        gap: 14px;
+        margin-top: 22px;
+      }
+
+      .teams-step {
+        display: grid;
+        grid-template-columns: 104px minmax(0, 1fr);
+        gap: 16px;
+        align-items: start;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        padding: 18px;
+      }
+
+      .teams-label {
+        color: var(--teal-dark);
+        font-size: 13px;
+        font-weight: 900;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .teams-step h3 {
+        margin-bottom: 6px;
+      }
+
+      .teams-step p {
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.55;
+      }
+
       .command-wrap {
         margin-top: 24px;
       }
@@ -543,7 +589,8 @@
         }
 
         .section-grid,
-        .feature-grid {
+        .feature-grid,
+        .teams-step {
           grid-template-columns: 1fr;
         }
 
@@ -570,6 +617,7 @@
           <a href='/demo'>Demo</a>
           <a href="#why">Why</a>
           <a href="#agent">AI Agent</a>
+          <a href="#teams">Teams</a>
           <a href="#ml-search">ML Search</a>
           <a href="#trust">Privacy</a>
           <a href="#install">Install</a>
@@ -688,6 +736,58 @@
             <div class="feature">
               <h3>Safe actions</h3>
               <p>Open, todo, cleanup, and delete endpoints exist, but destructive actions should stay confirmation-gated.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section section-grid" id="teams" aria-labelledby="teams-heading">
+        <div>
+          <div class="kicker">Coming soon to teams</div>
+          <h2 id="teams-heading">A shared memory layer for employees, projects, and workplace agents.</h2>
+        </div>
+        <div>
+          <p class="body-copy">
+            MemoryOS for Teams is the planned enterprise version: every employee keeps a private work memory, while approved project context can become shared team memory for coworkers and agents like Hermes Agent.
+          </p>
+          <div class="teams-note">
+            The product rule is simple: employees own private work memory, companies own shared project memory, and policies decide what crosses the boundary.
+          </div>
+          <div class="teams-flow" aria-label="MemoryOS Teams sequence">
+            <div class="teams-step">
+              <span class="teams-label">Setup</span>
+              <div>
+                <h3>Company policy</h3>
+                <p>Admins define capture sources, app and domain exclusions, retention, SSO, project workspaces, access rules, and audit requirements.</p>
+              </div>
+            </div>
+            <div class="teams-step">
+              <span class="teams-label">Workday</span>
+              <div>
+                <h3>Private employee memory</h3>
+                <p>Each worker's machine remembers approved meetings, docs, tickets, browser research, code reviews, decisions, blockers, and follow-ups.</p>
+              </div>
+            </div>
+            <div class="teams-step">
+              <span class="teams-label">Agents</span>
+              <div>
+                <h3>Hermes Agent stays caught up</h3>
+                <p>Approved agents can ask MemoryOS for recent employee context or project context instead of starting from a blank prompt.</p>
+              </div>
+            </div>
+            <div class="teams-step">
+              <span class="teams-label">Sharing</span>
+              <div>
+                <h3>Team memory forms from approved context</h3>
+                <p>Product decisions, customer requirements, launch risks, ownership, and handoff notes become searchable shared memory for the right teammates.</p>
+              </div>
+            </div>
+            <div class="teams-step">
+              <span class="teams-label">Continuity</span>
+              <div>
+                <h3>Teams stop losing context</h3>
+                <p>New hires ramp faster, managers see blockers, peers can catch up asynchronously, and approved knowledge survives vacations, team changes, and departures.</p>
+              </div>
             </div>
           </div>
         </div>
