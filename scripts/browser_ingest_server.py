@@ -1,15 +1,21 @@
 #!/usr/bin/env python3
 import json
 import os
+import platform
 import sqlite3
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 
-DB_PATH = os.environ.get(
-    "MEMORYOS_DB",
-    os.path.expanduser("~/Library/Application Support/MemoryOS/memoryos.db"),
-)
+if platform.system() == "Darwin":
+    DEFAULT_DATA_DIR = os.path.expanduser("~/Library/Application Support/MemoryOS")
+else:
+    DEFAULT_DATA_DIR = os.path.join(
+        os.path.expanduser(os.environ.get("XDG_DATA_HOME", "~/.local/share")),
+        "memoryos",
+    )
+
+DB_PATH = os.environ.get("MEMORYOS_DB", os.path.join(DEFAULT_DATA_DIR, "memoryos.db"))
 
 
 SCHEMA = """

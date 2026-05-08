@@ -15,7 +15,7 @@ ML_ROOT = PROJECT_ROOT / "ml"
 if str(ML_ROOT) not in sys.path:
     sys.path.insert(0, str(ML_ROOT))
 
-from memoryos.config import database_path
+from memoryos.config import database_path, support_dir
 from memoryos.db import CAPTURE_COLUMNS, connect, fetch_captures
 from memoryos.features import normalize_text, result_snippet
 from memoryos.index import (
@@ -67,7 +67,7 @@ def row_to_capture_result(
 
 
 def _support_dir() -> Path:
-    support = Path.home() / "Library" / "Application Support" / "MemoryOS"
+    support = support_dir()
     support.mkdir(parents=True, exist_ok=True)
     return support
 
@@ -682,9 +682,7 @@ def delete_todo(todo_id: int) -> bool:
 
 
 def _privacy_path():
-    support = Path.home() / "Library" / "Application Support" / "MemoryOS"
-    support.mkdir(parents=True, exist_ok=True)
-    return support / "privacy.json"
+    return _support_dir() / "privacy.json"
 
 
 DEFAULT_PRIVACY = PrivacySettings(

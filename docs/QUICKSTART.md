@@ -1,6 +1,6 @@
 # Quickstart
 
-This guide gets MemoryOS running locally on macOS. It is written for first-time users and for AI coding agents that are being asked to launch the software.
+This guide gets MemoryOS running locally on macOS or Linux. It is written for first-time users and for AI coding agents that are being asked to launch the software.
 
 MemoryOS has three main pieces:
 
@@ -16,7 +16,13 @@ From the repository root:
 scripts/install_memoryos.sh
 ```
 
-The installer handles the normal local setup:
+On Linux, use:
+
+```sh
+scripts/install_memoryos_linux.sh
+```
+
+The macOS installer handles the normal local setup:
 
 - Creates `.venv` and installs Python dependencies.
 - Uses the lightweight TF-IDF search runtime by default.
@@ -27,6 +33,12 @@ The installer handles the normal local setup:
 - Copies app files to `~/Library/Application Support/MemoryOS/app` before installing launch agents.
 - Registers launch agents for the backend, web UI, daemon, menu bar app, and Phase 7 scheduler.
 - Opens the web UI in the browser when the install finishes.
+
+The Linux installer handles the backend, web UI, Linux capture agent, optional
+Ollama model, and optional `systemd --user` services. It stores data under
+`~/.local/share/memoryos` by default. The Linux capture agent polls watched
+folders and uses `xdotool` for X11 active-window title capture when available.
+The Swift daemon and menu bar app are macOS-only.
 
 Expected local URLs after install:
 
@@ -53,6 +65,10 @@ scripts/install_memoryos.sh --with-embeddings   # add Torch, sentence-transforme
 scripts/install_memoryos.sh --model llama3.2    # use a different Ollama model
 ```
 
+The Linux installer supports the same common flags, with `--no-systemd` as the
+Linux equivalent of dependency-only service setup and `--skip-capture` to skip
+the Linux capture agent.
+
 The parts that may take longer than five minutes on a cold machine are downloading the local LLM model and installing the optional embedding extras. If `mistral` is already present, the installer skips that model download.
 
 ## Ask An Agent To Run It
@@ -60,7 +76,7 @@ The parts that may take longer than five minutes on a cold machine are downloadi
 If you are using an AI coding agent, point it at this repository and paste this:
 
 ```text
-You are in the MemoryOS repository. Read README.md and docs/QUICKSTART.md, then run scripts/install_memoryos.sh. Verify the backend at http://127.0.0.1:8765/health and the web UI at http://127.0.0.1:5173. Do not delete local data unless I explicitly ask.
+You are in the MemoryOS repository. Read README.md and docs/QUICKSTART.md, then run the correct installer for this OS: scripts/install_memoryos.sh on macOS or scripts/install_memoryos_linux.sh on Linux. Verify the backend at http://127.0.0.1:8765/health and the web UI at http://127.0.0.1:5173. Do not delete local data unless I explicitly ask.
 ```
 
 If the agent is outside the repo, include the folder path:
@@ -77,10 +93,11 @@ For a full explanation of every web UI tab and setting, read [WEB_UI_GUIDE.md](W
 
 You need:
 
-- macOS 13 or newer.
+- macOS 13 or newer, or a Linux desktop/server with systemd user services if you want automatic startup.
 - Python 3.10 or newer.
 - Node.js 18 or newer.
 - Chrome or another Chromium browser if you want browser capture.
+- `xdotool` if you want Linux active-window title capture on X11.
 - Xcode Command Line Tools if you want the native macOS daemon or menu bar app.
 
 Install Apple developer tools if `swiftc` is missing:

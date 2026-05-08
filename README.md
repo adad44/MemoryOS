@@ -29,13 +29,31 @@ From a fresh Mac, use the public installer:
 curl -fsSL https://memoryos-mac.netlify.app/install.sh | bash
 ```
 
+On Linux, the same public installer installs the backend and web UI under
+`~/.local/share/memoryos` and uses `systemd --user` when available:
+
+```sh
+curl -fsSL https://memoryos-mac.netlify.app/install.sh | bash
+```
+
 From an existing checkout, use the repo-local installer:
 
 ```sh
 scripts/install_memoryos.sh
 ```
 
-That command copies app files to `~/Library/Application Support/MemoryOS/app`, creates the Python virtual environment, installs backend and web dependencies, builds the React UI, installs/starts Ollama, pulls the local `mistral` model if needed, builds the Swift daemon/menu bar app, registers launch agents, starts MemoryOS on login, and opens the web UI.
+From an existing Linux checkout, use:
+
+```sh
+scripts/install_memoryos_linux.sh
+```
+
+The macOS installer copies app files to `~/Library/Application Support/MemoryOS/app`, creates the Python virtual environment, installs backend and web dependencies, builds the React UI, installs/starts Ollama, pulls the local `mistral` model if needed, builds the Swift daemon/menu bar app, registers launch agents, starts MemoryOS on login, and opens the web UI.
+
+The Linux installer installs the FastAPI backend, React web UI, Linux capture
+agent, optional Ollama model, and optional user systemd services. The Linux
+agent polls watched folders and uses `xdotool` for X11 active-window title
+capture when available. The Swift daemon and menu bar app are macOS-only.
 
 The default install uses the lightweight TF-IDF search runtime. Install the heavier sentence-transformer/FAISS extras only if you want embedding search or model training:
 
@@ -191,6 +209,12 @@ Run native daemon:
 
 ```sh
 daemon/.build/memoryos-daemon
+```
+
+Run Linux capture agent:
+
+```sh
+.venv/bin/python scripts/linux_capture_agent.py
 ```
 
 Build and open menu bar app:
