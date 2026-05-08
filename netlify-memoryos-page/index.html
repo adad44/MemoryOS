@@ -7,7 +7,7 @@
     <link rel="icon" href="assets/memoryos-logo.svg" type="image/svg+xml" />
     <meta
       name="description"
-      content="MemoryOS is a local-first memory layer for macOS that captures useful context, keeps it private, and makes it searchable."
+      content="MemoryOS is a local-first memory layer for macOS and Linux that captures useful context, keeps it private, and makes it searchable."
     />
     <style>
       :root {
@@ -577,7 +577,7 @@
       </nav>
       <div class="hero-content">
         <div class="hero-copy">
-          <p class="privacy-pill">Everything stays on your Mac. No cloud. No subscription.</p>
+          <p class="privacy-pill">Everything stays on your machine. macOS and Linux. No cloud. No subscription.</p>
           <h1 id="headline">MemoryOS</h1>
           <p class="tagline">Your computer's second brain &mdash; search everything you've seen, read, or worked on.</p>
           <p class="subcopy">
@@ -591,7 +591,7 @@
           <div class="hero-proof" aria-label="Product highlights">
             <span class="proof-item">Local SQLite storage</span>
             <span class="proof-item">TF-IDF + optional embeddings</span>
-            <span class="proof-item">Menu bar capture controls</span>
+            <span class="proof-item">macOS + Linux installers</span>
             <span class="proof-item">Local user model</span>
           </div>
         </div>
@@ -614,7 +614,7 @@
         </div>
         <div>
           <p class="body-copy">
-            MemoryOS now ships as a local macOS system: Swift capture daemon, Swift menu bar app, Chrome extension, local FastAPI backend, React web UI, SQLite database, search index, storage controls, todos, and a local You user-model tab.
+            MemoryOS now ships as a local macOS and Linux system: native macOS capture, Linux file and window-title capture, Chrome extension, local FastAPI backend, React web UI, SQLite database, search index, storage controls, todos, and a local You user-model tab.
           </p>
           <div class="feature-grid">
             <div class="feature">
@@ -631,7 +631,7 @@
             </div>
             <div class="feature">
               <h3>Control</h3>
-              <p>Pause capture from the menu bar, manage privacy lists, export JSON, clean storage, or delete local data.</p>
+              <p>Pause capture, manage privacy lists, export JSON, clean storage, or delete local data.</p>
             </div>
           </div>
         </div>
@@ -700,7 +700,7 @@
         </div>
         <div>
           <p class="body-copy">
-            The default installer uses TF-IDF so search works immediately on a normal Mac. If you want semantic search, install the embedding extras and rebuild the index with a local sentence-transformer and optional FAISS backend.
+            The default installer uses TF-IDF so search works immediately on a normal Mac or Linux machine. If you want semantic search, install the embedding extras and rebuild the index with a local sentence-transformer and optional FAISS backend.
           </p>
           <div class="steps">
             <div class="step">
@@ -731,7 +731,7 @@
           <div class="trust-list">
             <div class="trust-item">
               <span class="trust-icon">✓</span>
-              <p>Data is stored in a local SQLite database on your Mac.</p>
+              <p>Data is stored in a local SQLite database on your machine.</p>
             </div>
             <div class="trust-item">
               <span class="trust-icon">✓</span>
@@ -756,7 +756,7 @@
         </div>
         <div>
           <p class="body-copy">
-            This command downloads MemoryOS and runs the installer script for you. The installer creates the Python environment, installs backend and web dependencies, builds the React UI, installs or starts Ollama, pulls the local model unless skipped, builds the Swift daemon and menu bar app, registers launch agents, and opens the web UI.
+            This command downloads MemoryOS and runs the correct installer for your operating system. On macOS it builds the native daemon and menu bar app, registers launch agents, and opens the web UI. On Linux it installs the backend, React web UI, Linux capture agent, optional Ollama model, and user systemd services when available.
           </p>
           <div class="command-wrap">
             <div class="command-row">
@@ -773,11 +773,11 @@
           <div class="steps">
             <div class="step">
               <span class="step-number">1</span>
-              <p>Run the install command once from Terminal.</p>
+              <p>Run the install command once from Terminal on macOS or Linux.</p>
             </div>
             <div class="step">
               <span class="step-number">2</span>
-              <p>Grant Accessibility and Disk Access permissions when prompted.</p>
+              <p>On macOS, grant Accessibility and Disk Access permissions when prompted. On Linux, let the installer add system packages if needed.</p>
             </div>
             <div class="step">
               <span class="step-number">3</span>
@@ -800,7 +800,7 @@
         <div>
           <div class="footer-brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M9 13a4.5 4.5 0 0 0 3-4"/><path d="M6.003 5.125A3 3 0 0 0 6.401 6.5"/><path d="M3.477 10.896a4 4 0 0 1 .585-.396"/><path d="M6 18a4 4 0 0 1-1.967-.516"/><path d="M12 13h4"/><path d="M12 18h6a2 2 0 0 1 2 2v1"/><path d="M12 8h8"/><path d="M16 8V5a2 2 0 0 1 2-2"/><circle cx="16" cy="13" r=".5"/><circle cx="18" cy="3" r=".5"/><circle cx="20" cy="21" r=".5"/><circle cx="20" cy="8" r=".5"/></svg></span> MemoryOS</div>
           <p class="footer-copy">
-            Open source by Alan Diaz. MemoryOS is MIT licensed and designed as a local-first macOS memory engine: no hosted account, no cloud sync, and no subscription required.
+            Open source by Alan Diaz. MemoryOS is MIT licensed and designed as a local-first macOS and Linux memory engine: no hosted account, no cloud sync, and no subscription required.
           </p>
         </div>
         <div class="footer-links" aria-label="Footer links">
