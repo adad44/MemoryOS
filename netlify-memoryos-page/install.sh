@@ -61,6 +61,9 @@ command -v git >/dev/null 2>&1 || die "git is required. Install Git, then rerun 
 
 if [[ -d "$SOURCE_DIR/.git" ]]; then
   log "Updating MemoryOS source in $SOURCE_DIR"
+  if [[ -n "$(git -C "$SOURCE_DIR" status --porcelain)" && "${MEMORYOS_FORCE_RESET:-0}" != "1" ]]; then
+    die "$SOURCE_DIR has local changes. Commit/stash them or rerun with MEMORYOS_FORCE_RESET=1 to discard them."
+  fi
   git -C "$SOURCE_DIR" fetch --depth 1 origin "$BRANCH"
   git -C "$SOURCE_DIR" checkout -q "$BRANCH"
   git -C "$SOURCE_DIR" reset --hard -q "origin/$BRANCH"

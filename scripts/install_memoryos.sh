@@ -4,6 +4,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ORIGINAL_ARGS=("$@")
 MODEL="${MEMORYOS_OLLAMA_MODEL:-mistral}"
+DATA_DIR="${MEMORYOS_DATA_DIR:-$HOME/Library/Application Support/MemoryOS}"
+DB_PATH="${MEMORYOS_DB:-$DATA_DIR/memoryos.db}"
 INSTALL_ROOT="${MEMORYOS_INSTALL_ROOT:-$HOME/Library/Application Support/MemoryOS/app}"
 INSTALL_OLLAMA=1
 PULL_MODEL=1
@@ -246,6 +248,10 @@ done
 
 [[ "$(uname -s)" == "Darwin" ]] || die "MemoryOS native install currently supports macOS only."
 have brew || die "Homebrew is required. Install it from https://brew.sh, then rerun this script."
+
+export MEMORYOS_DATA_DIR="$DATA_DIR"
+export MEMORYOS_DB="$DB_PATH"
+export MEMORYOS_OLLAMA_MODEL="$MODEL"
 
 log "Installing MemoryOS from $ROOT"
 

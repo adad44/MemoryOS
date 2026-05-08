@@ -6,6 +6,8 @@ import sys
 import time
 from datetime import datetime, timedelta, timezone
 import json
+import platform
+import shutil
 from pathlib import Path
 from typing import Optional
 
@@ -15,7 +17,7 @@ ML_ROOT = PROJECT_ROOT / "ml"
 if str(ML_ROOT) not in sys.path:
     sys.path.insert(0, str(ML_ROOT))
 
-from memoryos.config import database_path, support_dir
+from memoryos.config import MODEL_DIR, database_path, support_dir
 from memoryos.db import CAPTURE_COLUMNS, connect, fetch_captures
 from memoryos.features import normalize_text, result_snippet
 from memoryos.index import (
@@ -86,8 +88,7 @@ def _database_size_bytes() -> int:
 
 
 def _index_size_bytes() -> int:
-    model_dir = PROJECT_ROOT / "ml" / "models"
-    return _path_size(model_dir)
+    return _path_size(MODEL_DIR)
 
 
 def _log_size_bytes() -> int:
@@ -154,6 +155,19 @@ def _host_from_url(url: Optional[str]) -> str:
         return (urlparse(url).hostname or "").lower()
     except Exception:
         return ""
+
+
+def _matches_fragment(value: str, fragments: list[str]) -> bool:
+    normalized = value.lower()
+    return any(fragment.lower() in normalized for fragment in fragments if fragment.strip())
+
+
+def violates_privacy_filter(app_name: str, title: Optional[str], url: Optional[str], settings: PrivacySettings) -> bool:
+    joined = " ".join([app_name or "", title or ""])
+    if _matches_fragment(joined, settings.blocked_apps):
+        return True
+    host = _host_from_url(url)
+    return _matches_fragment(host, settings.blocked_domains)
 
 
 def should_skip_capture(app_name: str, title: Optional[str], content: str, url: Optional[str], policy: StoragePolicy) -> bool:
@@ -357,6 +371,8 @@ def _timestamp_from_browser(value: Optional[float]) -> str:
 def insert_browser_capture(url: Optional[str], title: Optional[str], content: str, timestamp: Optional[float]) -> int:
     cleaned = normalize_text(content)[:3_000]
     policy = get_storage_policy()
+    if violates_privacy_filter("Browser", title, url, get_privacy_settings()):
+        return 0
     if should_skip_capture("Browser", title, cleaned, url, policy):
         return 0
     label = auto_noise_label("Browser", title, cleaned, url, policy)
@@ -420,7 +436,10 @@ def open_capture(capture_id: int) -> str:
     if not target:
         raise ValueError("Capture has no URL or file path to open.")
 
-    subprocess.run(["open", str(target)], check=True)
+    opener = "open" if platform.system() == "Darwin" else "xdg-open"
+    if shutil.which(opener) is None:
+        raise RuntimeError(f"{opener} is not available on this system.")
+    subprocess.run([opener, str(target)], check=True)
     return str(target)
 
 

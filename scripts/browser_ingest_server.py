@@ -2,9 +2,20 @@
 import json
 import os
 import platform
-import sqlite3
-from datetime import datetime, timezone
+import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+ML_ROOT = ROOT / "ml"
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+if str(ML_ROOT) not in sys.path:
+    sys.path.insert(0, str(ML_ROOT))
+
+from backend.service import insert_browser_capture
+from memoryos.db import connect
 
 
 if platform.system() == "Darwin":
@@ -18,40 +29,10 @@ else:
 DB_PATH = os.environ.get("MEMORYOS_DB", os.path.join(DEFAULT_DATA_DIR, "memoryos.db"))
 
 
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS captures (
-  id           INTEGER PRIMARY KEY,
-  timestamp    DATETIME NOT NULL,
-  app_name     TEXT NOT NULL,
-  window_title TEXT,
-  content      TEXT NOT NULL,
-  source_type  TEXT NOT NULL,
-  url          TEXT,
-  file_path    TEXT,
-  is_noise     INTEGER DEFAULT NULL,
-  embedding    BLOB
-);
-
-CREATE TABLE IF NOT EXISTS sessions (
-  id          INTEGER PRIMARY KEY,
-  app_name    TEXT NOT NULL,
-  start_time  DATETIME NOT NULL,
-  end_time    DATETIME,
-  duration_s  INTEGER
-);
-"""
-
-
 def init_db():
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.executescript(SCHEMA)
-
-
-def iso_timestamp(value):
-    if isinstance(value, (int, float)):
-        return datetime.fromtimestamp(value / 1000, timezone.utc).isoformat()
-    return datetime.now(timezone.utc).isoformat()
+    with connect(Path(DB_PATH)):
+        pass
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -74,22 +55,12 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(str(exc).encode())
             return
 
-        with sqlite3.connect(DB_PATH) as conn:
-            conn.execute(
-                """
-                INSERT INTO captures
-                (timestamp, app_name, window_title, content, source_type, url, file_path)
-                VALUES (?, ?, ?, ?, ?, ?, NULL)
-                """,
-                (
-                    iso_timestamp(payload.get("timestamp")),
-                    "Browser",
-                    payload.get("title"),
-                    content[:3000],
-                    "browser",
-                    payload.get("url"),
-                ),
-            )
+        insert_browser_capture(
+            url=payload.get("url"),
+            title=payload.get("title"),
+            content=content,
+            timestamp=payload.get("timestamp"),
+        )
 
         self.send_response(204)
         self.end_headers()

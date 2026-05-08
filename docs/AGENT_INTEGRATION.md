@@ -61,22 +61,12 @@ curl -X POST http://127.0.0.1:8765/open \
   -d '{"capture_id":123}'
 ```
 
-## API Key
-
-Most local setups leave the API key blank. If the backend is started with `MEMORYOS_API_KEY`, agents must send:
-
-```text
-X-MemoryOS-API-Key: <key>
-```
-
-This is not an OpenAI, Ollama, Chrome, or Apple key. It only protects the local MemoryOS backend.
-
 ## Safety Defaults
 
 - Keep MemoryOS bound to `127.0.0.1`.
 - Treat `/open`, `/forget`, `/cleanup`, and delete endpoints as confirmation-required tools.
 - Prefer `/search`, `/recent`, `/user-model`, `/beliefs`, and `/todos` as low-risk read/write surfaces.
-- Do not expose the backend over a public network without an API key and additional network controls.
+- Do not expose the backend over a public network. MemoryOS is designed for localhost-first use.
 
 ## Hermes / OpenClaw Pattern
 

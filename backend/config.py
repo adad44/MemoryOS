@@ -13,15 +13,10 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 class BackendSettings:
     host: str
     port: int
-    api_key: Optional[str]
     cors_origins: tuple[str, ...]
     index_interval_seconds: int
     index_backend: str
     index_model: Optional[str]
-
-    @property
-    def api_key_enabled(self) -> bool:
-        return bool(self.api_key)
 
 
 def load_settings() -> BackendSettings:
@@ -32,7 +27,6 @@ def load_settings() -> BackendSettings:
     return BackendSettings(
         host=os.environ.get("MEMORYOS_HOST", "127.0.0.1"),
         port=int(os.environ.get("MEMORYOS_PORT", "8765")),
-        api_key=os.environ.get("MEMORYOS_API_KEY"),
         cors_origins=tuple(origin.strip() for origin in origins.split(",") if origin.strip()),
         index_interval_seconds=int(os.environ.get("MEMORYOS_INDEX_INTERVAL_SECONDS", "1800")),
         index_backend=os.environ.get("MEMORYOS_INDEX_BACKEND", "auto"),

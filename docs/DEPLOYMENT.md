@@ -94,14 +94,6 @@ scripts/uninstall_backend_launch_agent.sh
 scripts/uninstall_menubar_launch_agent.sh
 ```
 
-## Optional API Key
-
-```sh
-MEMORYOS_API_KEY="dev-secret" scripts/run_backend.sh
-```
-
-Then set the same key in the web UI and menu bar settings.
-
 ## Web Hosting
 
 The web UI can be deployed as a static Vite app, but it still talks to the local backend.

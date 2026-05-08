@@ -175,11 +175,6 @@ If another backend is running, set this to that port, such as:
 http://127.0.0.1:8766
 ```
 
-- **API Key**: optional key sent as `X-MemoryOS-API-Key`.
-  - Leave blank for the normal local setup.
-  - Fill it only if the backend was started with `MEMORYOS_API_KEY`.
-  - This is mainly for developers, testers, power users, or agent-tool integrations that intentionally protect the local backend.
-  - It is not an OpenAI, Ollama, Chrome, or Apple API key.
 - **Check**: tests backend connectivity.
 
 ### Privacy

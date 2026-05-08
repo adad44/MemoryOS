@@ -24,22 +24,6 @@ http://127.0.0.1:8765
 
 The backend intentionally binds to localhost by default.
 
-## Optional API Key
-
-Enable API-key auth:
-
-```sh
-MEMORYOS_API_KEY="dev-secret" scripts/run_backend.sh
-```
-
-Then send:
-
-```text
-X-MemoryOS-API-Key: dev-secret
-```
-
-If `MEMORYOS_API_KEY` is unset, endpoints are open to local callers.
-
 ## Endpoints
 
 ### Health
@@ -212,7 +196,6 @@ curl -X POST http://127.0.0.1:8765/forget \
 | :-- | :-- | :-- |
 | `MEMORYOS_HOST` | `127.0.0.1` | Bind address |
 | `MEMORYOS_PORT` | `8765` | Port |
-| `MEMORYOS_API_KEY` | unset | Optional local API key |
 | `MEMORYOS_DB` | `~/Library/Application Support/MemoryOS/memoryos.db` | SQLite path |
 | `MEMORYOS_CORS_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | Web UI origins |
 | `MEMORYOS_INDEX_INTERVAL_SECONDS` | `1800` | Background reindex interval while backend is running |

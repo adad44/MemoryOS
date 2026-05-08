@@ -294,4 +294,3 @@ class OpenCaptureResponse(BaseModel):
 
 class HealthResponse(BaseModel):
     ok: bool
-    api_key_enabled: bool

@@ -15,11 +15,6 @@ final class MemoryOSClient: ObservableObject {
             UserDefaults.standard.set(webURL, forKey: "webURL")
         }
     }
-    @Published var apiKey: String {
-        didSet {
-            UserDefaults.standard.set(apiKey, forKey: "apiKey")
-        }
-    }
     @Published var state: BackendState = .checking
     @Published var stats: StatsResponse?
     @Published var isRefreshingIndex = false
@@ -32,7 +27,6 @@ final class MemoryOSClient: ObservableObject {
     init() {
         backendURL = UserDefaults.standard.string(forKey: "backendURL") ?? "http://127.0.0.1:8765"
         webURL = UserDefaults.standard.string(forKey: "webURL") ?? "http://127.0.0.1:5173"
-        apiKey = UserDefaults.standard.string(forKey: "apiKey") ?? ""
         let supportURL = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Application Support/MemoryOS", isDirectory: true)
         pauseFlagURL = supportURL.appendingPathComponent("capture.paused")
@@ -144,9 +138,6 @@ final class MemoryOSClient: ObservableObject {
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        if !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            request.setValue(apiKey, forHTTPHeaderField: "X-MemoryOS-API-Key")
-        }
         if let body {
             request.httpBody = try JSONEncoder().encode(body)
         }

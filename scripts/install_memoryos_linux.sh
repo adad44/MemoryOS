@@ -268,6 +268,8 @@ write_systemd_unit() {
   local description="$2"
   local command="$3"
   local unit_dir="$HOME/.config/systemd/user"
+  local npm_bin="${MEMORYOS_NPM:-$(command -v npm 2>/dev/null || true)}"
+  local path_value="${PATH:-/usr/local/bin:/usr/bin:/bin}"
   mkdir -p "$unit_dir"
   cat > "$unit_dir/$name.service" <<UNIT
 [Unit]
@@ -279,6 +281,16 @@ Type=simple
 WorkingDirectory=$ROOT
 Environment=MEMORYOS_DATA_DIR=$DATA_DIR
 Environment=MEMORYOS_DB=$DB_PATH
+Environment=MEMORYOS_OLLAMA_MODEL=$MODEL
+Environment=PATH=$path_value
+UNIT
+  if [[ -n "$npm_bin" ]]; then
+    printf "Environment=MEMORYOS_NPM=%s\n" "$npm_bin" >> "$unit_dir/$name.service"
+  fi
+  if [[ -n "${MEMORYOS_LINUX_WATCH_DIRS:-}" ]]; then
+    printf "Environment=MEMORYOS_LINUX_WATCH_DIRS=%s\n" "$MEMORYOS_LINUX_WATCH_DIRS" >> "$unit_dir/$name.service"
+  fi
+  cat >> "$unit_dir/$name.service" <<UNIT
 ExecStart=$command
 Restart=on-failure
 RestartSec=5
@@ -430,6 +442,13 @@ if (( INSTALL_OLLAMA == 1 )); then
       warn "Cold model downloads can take longer than five minutes on slower networks."
       run ollama pull "$MODEL"
     fi
+  fi
+fi
+
+if (( INSTALL_SCHEDULER == 1 )); then
+  if ! have ollama || ! wait_for_ollama || ! model_is_available; then
+    warn "Skipping scheduler because Ollama/model is not available. Rerun without --skip-model-pull to enable abstraction scheduling."
+    INSTALL_SCHEDULER=0
   fi
 fi
 

@@ -19,4 +19,4 @@ if [[ ! -d dist ]]; then
   "$NPM" run build
 fi
 
-exec "$NPM" run preview -- --host "$HOST" --port "$PORT"
+exec "$NPM" run preview -- --host "$HOST" --port "$PORT" --strictPort

@@ -7,8 +7,6 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ML_ROOT = PROJECT_ROOT / "ml"
-MODEL_DIR = ML_ROOT / "models"
-PROCESSED_DIR = ML_ROOT / "data" / "processed"
 
 
 def support_dir() -> Path:
@@ -28,6 +26,10 @@ def database_path() -> Path:
     if override:
         return Path(override).expanduser()
     return support_dir() / "memoryos.db"
+
+
+MODEL_DIR = support_dir() / "models"
+PROCESSED_DIR = support_dir() / "data" / "processed"
 
 
 def ensure_dirs() -> None:

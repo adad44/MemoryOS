@@ -4,12 +4,6 @@ import Foundation
 
 struct HealthResponse: Decodable {
     let ok: Bool
-    let apiKeyEnabled: Bool
-
-    enum CodingKeys: String, CodingKey {
-        case ok
-        case apiKeyEnabled = "api_key_enabled"
-    }
 }
 
 struct StatsResponse: Decodable {

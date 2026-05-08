@@ -5,6 +5,8 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PLIST="$HOME/Library/LaunchAgents/com.memoryos.daemon.plist"
 LOG_DIR="$ROOT/.logs"
 DAEMON="$ROOT/daemon/.build/memoryos-daemon"
+DATA_DIR="${MEMORYOS_DATA_DIR:-$HOME/Library/Application Support/MemoryOS}"
+DB_PATH="${MEMORYOS_DB:-$DATA_DIR/memoryos.db}"
 
 if [[ "${MEMORYOS_SKIP_BUILD:-0}" != "1" || ! -x "$DAEMON" ]]; then
   "$ROOT/scripts/build_daemon.sh"
@@ -19,6 +21,13 @@ cat > "$PLIST" <<PLIST
 <dict>
   <key>Label</key>
   <string>com.memoryos.daemon</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>MEMORYOS_DATA_DIR</key>
+    <string>$DATA_DIR</string>
+    <key>MEMORYOS_DB</key>
+    <string>$DB_PATH</string>
+  </dict>
   <key>ProgramArguments</key>
   <array>
     <string>$DAEMON</string>

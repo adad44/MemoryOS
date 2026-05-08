@@ -4,7 +4,7 @@ import asyncio
 from contextlib import suppress
 from typing import Optional
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Response
+from fastapi import FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import load_settings
@@ -43,7 +43,6 @@ from .schemas import (
     UserModelResponse,
     WeeklyDigestResponse,
 )
-from .security import require_api_key
 from .service import (
     insert_browser_capture,
     cleanup_storage,
@@ -94,16 +93,16 @@ app.add_middleware(
     allow_origins=list(settings.cors_origins),
     allow_credentials=False,
     allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE"],
-    allow_headers=["Content-Type", "X-MemoryOS-API-Key"],
+    allow_headers=["Content-Type"],
 )
 
 
 @app.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
-    return HealthResponse(ok=True, api_key_enabled=settings.api_key_enabled)
+    return HealthResponse(ok=True)
 
 
-@app.post("/search", response_model=SearchResponse, dependencies=[Depends(require_api_key)])
+@app.post("/search", response_model=SearchResponse)
 def search_endpoint(request: SearchRequest) -> SearchResponse:
     try:
         response = search(request.query, request.top_k, request.candidate_k)
@@ -121,7 +120,7 @@ def search_endpoint(request: SearchRequest) -> SearchResponse:
     )
 
 
-@app.get("/recent", response_model=RecentResponse, dependencies=[Depends(require_api_key)])
+@app.get("/recent", response_model=RecentResponse)
 def recent_endpoint(
     limit: int = Query(default=50, ge=1, le=500),
     app_name: Optional[str] = None,
@@ -131,12 +130,12 @@ def recent_endpoint(
     return RecentResponse(count=len(results), results=results)
 
 
-@app.get("/stats", response_model=StatsResponse, dependencies=[Depends(require_api_key)])
+@app.get("/stats", response_model=StatsResponse)
 def stats_endpoint() -> StatsResponse:
     return StatsResponse(**stats())
 
 
-@app.post("/refresh-index", response_model=RefreshResponse, dependencies=[Depends(require_api_key)])
+@app.post("/refresh-index", response_model=RefreshResponse)
 def refresh_index_endpoint(request: RefreshRequest) -> RefreshResponse:
     if request.backend not in {"auto", "sentence", "tfidf"}:
         raise HTTPException(status_code=422, detail="backend must be one of: auto, sentence, tfidf")
@@ -151,7 +150,7 @@ def refresh_index_endpoint(request: RefreshRequest) -> RefreshResponse:
     return RefreshResponse(indexed_count=count, artifact_path=artifact_path, backend=backend_name)
 
 
-@app.post("/capture/browser", dependencies=[Depends(require_api_key)])
+@app.post("/capture/browser")
 def capture_browser_endpoint(request: BrowserCaptureRequest) -> Response:
     insert_browser_capture(
         url=request.url,
@@ -162,7 +161,7 @@ def capture_browser_endpoint(request: BrowserCaptureRequest) -> Response:
     return Response(status_code=204)
 
 
-@app.post("/click", dependencies=[Depends(require_api_key)])
+@app.post("/click")
 def click_endpoint(
     query: str,
     capture_id: int,
@@ -173,7 +172,7 @@ def click_endpoint(
     return Response(status_code=204)
 
 
-@app.post("/open", response_model=OpenCaptureResponse, dependencies=[Depends(require_api_key)])
+@app.post("/open", response_model=OpenCaptureResponse)
 def open_capture_endpoint(request: OpenCaptureRequest) -> OpenCaptureResponse:
     try:
         target = open_capture(request.capture_id)
@@ -184,7 +183,7 @@ def open_capture_endpoint(request: OpenCaptureRequest) -> OpenCaptureResponse:
     return OpenCaptureResponse(opened=True, target=target)
 
 
-@app.patch("/captures/{capture_id}/noise", dependencies=[Depends(require_api_key)])
+@app.patch("/captures/{capture_id}/noise")
 def label_capture_endpoint(capture_id: int, request: NoiseLabelRequest) -> Response:
     try:
         found = update_capture_noise_label(capture_id, request.is_noise)
@@ -195,7 +194,7 @@ def label_capture_endpoint(capture_id: int, request: NoiseLabelRequest) -> Respo
     return Response(status_code=204)
 
 
-@app.patch("/captures/noise/bulk", response_model=BulkNoiseLabelResponse, dependencies=[Depends(require_api_key)])
+@app.patch("/captures/noise/bulk", response_model=BulkNoiseLabelResponse)
 def bulk_label_capture_endpoint(request: BulkNoiseLabelRequest) -> BulkNoiseLabelResponse:
     try:
         updated = update_capture_noise_labels(request.capture_ids, request.is_noise)
@@ -204,7 +203,7 @@ def bulk_label_capture_endpoint(request: BulkNoiseLabelRequest) -> BulkNoiseLabe
     return BulkNoiseLabelResponse(updated_count=updated)
 
 
-@app.patch("/captures/{capture_id}/pin", dependencies=[Depends(require_api_key)])
+@app.patch("/captures/{capture_id}/pin")
 def pin_capture_endpoint(capture_id: int, request: PinRequest) -> Response:
     found = update_capture_pin(capture_id, request.is_pinned)
     if not found:
@@ -212,18 +211,18 @@ def pin_capture_endpoint(capture_id: int, request: PinRequest) -> Response:
     return Response(status_code=204)
 
 
-@app.get("/collections", response_model=CollectionsResponse, dependencies=[Depends(require_api_key)])
+@app.get("/collections", response_model=CollectionsResponse)
 def collections_endpoint() -> CollectionsResponse:
     collections = smart_collections()
     return CollectionsResponse(count=len(collections), collections=collections)
 
 
-@app.get("/digest/weekly", response_model=WeeklyDigestResponse, dependencies=[Depends(require_api_key)])
+@app.get("/digest/weekly", response_model=WeeklyDigestResponse)
 def weekly_digest_endpoint() -> WeeklyDigestResponse:
     return WeeklyDigestResponse(**weekly_digest())
 
 
-@app.get("/todos", response_model=TodoListResponse, dependencies=[Depends(require_api_key)])
+@app.get("/todos", response_model=TodoListResponse)
 def todos_endpoint(status: Optional[str] = None) -> TodoListResponse:
     if status is not None and status not in {"open", "done"}:
         raise HTTPException(status_code=422, detail="status must be open or done")
@@ -231,7 +230,7 @@ def todos_endpoint(status: Optional[str] = None) -> TodoListResponse:
     return TodoListResponse(count=len(todos), todos=todos)
 
 
-@app.post("/todos", response_model=TodoItem, dependencies=[Depends(require_api_key)])
+@app.post("/todos", response_model=TodoItem)
 def create_todo_endpoint(request: TodoCreateRequest) -> TodoItem:
     return create_todo(
         title=request.title,
@@ -242,7 +241,7 @@ def create_todo_endpoint(request: TodoCreateRequest) -> TodoItem:
     )
 
 
-@app.patch("/todos/{todo_id}", response_model=TodoItem, dependencies=[Depends(require_api_key)])
+@app.patch("/todos/{todo_id}", response_model=TodoItem)
 def update_todo_endpoint(todo_id: int, request: TodoUpdateRequest) -> TodoItem:
     try:
         todo = update_todo(
@@ -261,7 +260,7 @@ def update_todo_endpoint(todo_id: int, request: TodoUpdateRequest) -> TodoItem:
     return todo
 
 
-@app.delete("/todos/{todo_id}", dependencies=[Depends(require_api_key)])
+@app.delete("/todos/{todo_id}")
 def delete_todo_endpoint(todo_id: int, confirm: bool = False) -> Response:
     if not confirm:
         raise HTTPException(status_code=400, detail="Set confirm=true before deleting a todo.")
@@ -270,7 +269,7 @@ def delete_todo_endpoint(todo_id: int, confirm: bool = False) -> Response:
     return Response(status_code=204)
 
 
-@app.get("/user-model", response_model=UserModelResponse, dependencies=[Depends(require_api_key)])
+@app.get("/user-model", response_model=UserModelResponse)
 def user_model_endpoint() -> UserModelResponse:
     model = latest_user_model()
     if not model:
@@ -278,7 +277,7 @@ def user_model_endpoint() -> UserModelResponse:
     return UserModelResponse(**model)
 
 
-@app.get("/beliefs", response_model=BeliefListResponse, dependencies=[Depends(require_api_key)])
+@app.get("/beliefs", response_model=BeliefListResponse)
 def beliefs_endpoint(
     belief_type: Optional[str] = None,
     min_confidence: float = Query(default=0.0, ge=0.0, le=1.0),
@@ -291,7 +290,7 @@ def beliefs_endpoint(
     return BeliefListResponse(count=len(beliefs), beliefs=beliefs)
 
 
-@app.delete("/beliefs/{topic}", dependencies=[Depends(require_api_key)])
+@app.delete("/beliefs/{topic}")
 def delete_belief_endpoint(topic: str, confirm: bool = False) -> Response:
     if not confirm:
         raise HTTPException(status_code=400, detail="Set confirm=true before deleting a belief.")
@@ -300,7 +299,7 @@ def delete_belief_endpoint(topic: str, confirm: bool = False) -> Response:
     return Response(status_code=204)
 
 
-@app.post("/run-abstraction", response_model=RunAbstractionResponse, dependencies=[Depends(require_api_key)])
+@app.post("/run-abstraction", response_model=RunAbstractionResponse)
 def run_abstraction_endpoint() -> RunAbstractionResponse:
     started = trigger_abstraction_background()
     if not started:
@@ -308,43 +307,43 @@ def run_abstraction_endpoint() -> RunAbstractionResponse:
     return RunAbstractionResponse(status="started", message="Abstraction engine running in background.")
 
 
-@app.get("/abstraction-runs", response_model=AbstractionRunsResponse, dependencies=[Depends(require_api_key)])
+@app.get("/abstraction-runs", response_model=AbstractionRunsResponse)
 def abstraction_runs_endpoint(limit: int = Query(default=10, ge=1, le=100)) -> AbstractionRunsResponse:
     runs = abstraction_runs(limit=limit)
     return AbstractionRunsResponse(count=len(runs), runs=runs)
 
 
-@app.get("/abstraction-status", response_model=AbstractionStatusResponse, dependencies=[Depends(require_api_key)])
+@app.get("/abstraction-status", response_model=AbstractionStatusResponse)
 def abstraction_status_endpoint() -> AbstractionStatusResponse:
     return AbstractionStatusResponse(**abstraction_status())
 
 
-@app.get("/privacy", response_model=PrivacySettings, dependencies=[Depends(require_api_key)])
+@app.get("/privacy", response_model=PrivacySettings)
 def privacy_endpoint() -> PrivacySettings:
     return get_privacy_settings()
 
 
-@app.put("/privacy", response_model=PrivacySettings, dependencies=[Depends(require_api_key)])
+@app.put("/privacy", response_model=PrivacySettings)
 def update_privacy_endpoint(request: PrivacySettings) -> PrivacySettings:
     return save_privacy_settings(request)
 
 
-@app.get("/storage", response_model=StorageStatsResponse, dependencies=[Depends(require_api_key)])
+@app.get("/storage", response_model=StorageStatsResponse)
 def storage_endpoint() -> StorageStatsResponse:
     return StorageStatsResponse(**storage_stats())
 
 
-@app.get("/storage-policy", response_model=StoragePolicy, dependencies=[Depends(require_api_key)])
+@app.get("/storage-policy", response_model=StoragePolicy)
 def storage_policy_endpoint() -> StoragePolicy:
     return get_storage_policy()
 
 
-@app.put("/storage-policy", response_model=StoragePolicy, dependencies=[Depends(require_api_key)])
+@app.put("/storage-policy", response_model=StoragePolicy)
 def update_storage_policy_endpoint(request: StoragePolicy) -> StoragePolicy:
     return save_storage_policy(request)
 
 
-@app.post("/cleanup", response_model=CleanupResponse, dependencies=[Depends(require_api_key)])
+@app.post("/cleanup", response_model=CleanupResponse)
 def cleanup_endpoint(request: CleanupRequest) -> CleanupResponse:
     if not request.confirm:
         raise HTTPException(status_code=400, detail="Set confirm=true before cleanup.")
@@ -358,12 +357,12 @@ def cleanup_endpoint(request: CleanupRequest) -> CleanupResponse:
     )
 
 
-@app.get("/export", response_model=ExportResponse, dependencies=[Depends(require_api_key)])
+@app.get("/export", response_model=ExportResponse)
 def export_endpoint() -> ExportResponse:
     return ExportResponse(**export_data())
 
 
-@app.post("/forget", response_model=ForgetResponse, dependencies=[Depends(require_api_key)])
+@app.post("/forget", response_model=ForgetResponse)
 def forget_endpoint(request: ForgetRequest) -> ForgetResponse:
     if not request.confirm:
         raise HTTPException(status_code=400, detail="Set confirm=true before deleting captures.")

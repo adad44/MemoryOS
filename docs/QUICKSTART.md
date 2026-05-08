@@ -159,10 +159,8 @@ curl http://127.0.0.1:8765/health
 Expected response:
 
 ```json
-{"ok":true,"api_key_enabled":false}
+{"ok":true}
 ```
-
-For the simplest local setup, leave `MEMORYOS_API_KEY` unset.
 
 ## 4. Start The Web UI
 
@@ -402,13 +400,6 @@ MEMORYOS_PORT=8766 scripts/run_backend.sh
 
 Then set the web UI backend URL to `http://127.0.0.1:8766` in Settings.
 
-API key field is blank:
-
-- That is normal for the default local setup.
-- Leave it blank unless you started the backend with `MEMORYOS_API_KEY=...`.
-- The field is for users who intentionally protect the local backend, such as developers, testers, or people exposing MemoryOS to another local agent/tool workflow.
-- When used, the value is sent as the `X-MemoryOS-API-Key` header.
-
 Web UI port is already in use:
 
 ```sh
@@ -419,7 +410,6 @@ npm run dev -- --port 5174
 Chrome extension records nothing:
 
 - Confirm the backend is running.
-- Confirm `MEMORYOS_API_KEY` is unset, or update the extension/backend flow before requiring a key.
 - Confirm you loaded the repo's `extension/` folder as an unpacked extension.
 
 Native capture records nothing:

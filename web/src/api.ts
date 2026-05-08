@@ -45,7 +45,6 @@ export type StatsResponse = {
 
 export type HealthResponse = {
   ok: boolean;
-  api_key_enabled: boolean;
 };
 
 export type PrivacySettings = {
@@ -174,24 +173,19 @@ export type AbstractionStatus = {
 
 export type ClientConfig = {
   baseUrl: string;
-  apiKey: string;
 };
 
-const jsonHeaders = (config: ClientConfig): HeadersInit => {
-  const headers: Record<string, string> = {
+const jsonHeaders = (): HeadersInit => {
+  return {
     'Content-Type': 'application/json',
   };
-  if (config.apiKey.trim()) {
-    headers['X-MemoryOS-API-Key'] = config.apiKey.trim();
-  }
-  return headers;
 };
 
 async function request<T>(config: ClientConfig, path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${config.baseUrl}${path}`, {
     ...init,
     headers: {
-      ...jsonHeaders(config),
+      ...jsonHeaders(),
       ...(init?.headers || {}),
     },
   });

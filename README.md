@@ -163,12 +163,6 @@ MEMORYOS_DB=/tmp/memoryos.db scripts/run_backend.sh
 
 The local app bundle is currently unsigned. The menu bar app includes local permission onboarding for Accessibility, Full Disk Access review, and Screen Recording fallback setup. If you distribute it outside local development, add app signing and notarization.
 
-### Optional API Key
-
-The blank API key field in the web UI and menu bar app is for users who start the backend with `MEMORYOS_API_KEY`.
-
-Most local users should leave it blank. It is only needed when someone deliberately protects the local backend, for example a developer, tester, or power user running MemoryOS on a shared machine, through a tunnel, or inside another agent/tool workflow. When enabled, clients send the value as the `X-MemoryOS-API-Key` header.
-
 ## Project Structure
 
 ```text

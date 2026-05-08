@@ -60,7 +60,7 @@ scripts/install_memoryos.sh
 - Pause/Resume Capture.
 - Refresh Index.
 - Open backend API docs.
-- Backend URL, web URL, and API key settings.
+- Backend URL and web URL settings.
 - Quit.
 
 ## Permission Onboarding

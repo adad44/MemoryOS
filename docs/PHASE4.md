@@ -63,7 +63,6 @@ http://127.0.0.1:5173
 ### Settings
 
 - Backend URL.
-- Optional API key.
 - Backend health check.
 - Privacy blocklists.
 - Storage dashboard with database, index, log, and total usage.
@@ -78,7 +77,7 @@ http://127.0.0.1:5173
 | :-- | :-- | :-- |
 | `VITE_API_URL` | `http://127.0.0.1:8765` | Backend URL |
 
-The UI stores backend URL and API key in browser local storage.
+The UI stores the backend URL in browser local storage.
 
 ## Completion Notes
 

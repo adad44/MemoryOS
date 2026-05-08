@@ -15,7 +15,8 @@ struct MemoryOSConfig {
 
     static func load() -> MemoryOSConfig {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
-        let dataDir = "\(home)/Library/Application Support/MemoryOS"
+        let dataDir = ProcessInfo.processInfo.environment["MEMORYOS_DATA_DIR"]
+            ?? "\(home)/Library/Application Support/MemoryOS"
         try? FileManager.default.createDirectory(
             atPath: dataDir,
             withIntermediateDirectories: true

@@ -199,6 +199,21 @@ def insert_capture(
     file_path: Optional[str] = None,
 ) -> int:
     with connect() as conn:
+        duplicate = conn.execute(
+            """
+            SELECT id FROM captures
+            WHERE source_type = ?
+              AND COALESCE(file_path, '') = COALESCE(?, '')
+              AND COALESCE(url, '') = COALESCE(?, '')
+              AND COALESCE(window_title, '') = COALESCE(?, '')
+              AND content = ?
+            ORDER BY timestamp DESC
+            LIMIT 1
+            """,
+            (source_type, file_path, url, window_title, content),
+        ).fetchone()
+        if duplicate:
+            return int(duplicate["id"])
         cursor = conn.execute(
             """
             INSERT INTO captures
@@ -258,6 +273,25 @@ class LinuxCaptureAgent:
         self.file_state: dict[Path, tuple[int, int]] = {}
         self.last_file_scan = 0.0
 
+    def iter_candidate_files(self, base: Path):
+        ignored_dirs = {
+            ".cache",
+            ".git",
+            ".hg",
+            ".svn",
+            ".venv",
+            "__pycache__",
+            "build",
+            "dist",
+            "node_modules",
+            "target",
+            "vendor",
+        }
+        for root, dirnames, filenames in os.walk(base):
+            dirnames[:] = [name for name in dirnames if name not in ignored_dirs and not name.startswith(".")]
+            for filename in filenames:
+                yield Path(root) / filename
+
     def stop(self, *_: object) -> None:
         self.running = False
 
@@ -280,7 +314,7 @@ class LinuxCaptureAgent:
         for base in self.config.watched_dirs:
             if not base.exists():
                 continue
-            for path in base.rglob("*"):
+            for path in self.iter_candidate_files(base):
                 if not should_capture_file(path, self.config):
                     continue
                 try:

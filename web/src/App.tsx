@@ -67,13 +67,11 @@ const searchExamples = ['what was i doing yesterday at 9am', 'search work from y
 function loadConfig(): ClientConfig {
   return {
     baseUrl: localStorage.getItem('memoryos.baseUrl') || DEFAULT_BASE_URL,
-    apiKey: localStorage.getItem('memoryos.apiKey') || '',
   };
 }
 
 function saveConfig(config: ClientConfig) {
   localStorage.setItem('memoryos.baseUrl', config.baseUrl);
-  localStorage.setItem('memoryos.apiKey', config.apiKey);
 }
 
 function formatTime(value: string | null) {
@@ -166,7 +164,6 @@ export function App() {
   const [config, setConfig] = useState<ClientConfig>(loadConfig);
   const [tab, setTab] = useState<Tab>('home');
   const [health, setHealth] = useState<'online' | 'offline' | 'checking'>('checking');
-  const [healthKey, setHealthKey] = useState(false);
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
@@ -176,10 +173,8 @@ export function App() {
     try {
       const response = await api.health(config);
       setHealth(response.ok ? 'online' : 'offline');
-      setHealthKey(response.api_key_enabled);
     } catch {
       setHealth('offline');
-      setHealthKey(false);
     }
   };
 
@@ -199,7 +194,7 @@ export function App() {
   useEffect(() => {
     void checkHealth();
     void loadStats();
-  }, [config.baseUrl, config.apiKey]);
+  }, [config.baseUrl]);
 
   const statusClass =
     health === 'online' ? 'text-moss' : health === 'offline' ? 'text-rust' : 'text-signal';
@@ -217,7 +212,6 @@ export function App() {
               <div className="flex items-center gap-2 text-sm text-slate-600">
                 <Circle size={9} className={statusClass} fill="currentColor" />
                 <span>{health}</span>
-                {healthKey && <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">key</span>}
               </div>
             </div>
           </div>
@@ -297,7 +291,6 @@ export function App() {
               config={config}
               onConfig={setConfig}
               onHealth={checkHealth}
-              apiKeyEnabled={healthKey}
               onError={setError}
               onToast={setToast}
             />
@@ -460,22 +453,28 @@ function SearchView({ config, onError }: { config: ClientConfig; onError: (value
       setResultsLoadedAt(null);
       return;
     }
+    let cancelled = false;
     const handle = window.setTimeout(async () => {
       setLoading(true);
       try {
         const response = await api.search(config, trimmed, 10);
+        if (cancelled) return;
         setResults(response.results);
         setSearchMeta(response);
         setResultsLoadedAt(Date.now());
         onError('');
       } catch (err) {
+        if (cancelled) return;
         onError(err instanceof Error ? err.message : String(err));
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }, 300);
-    return () => window.clearTimeout(handle);
-  }, [query, config.baseUrl, config.apiKey]);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(handle);
+    };
+  }, [query, config.baseUrl]);
 
   return (
     <div className="space-y-4">
@@ -537,7 +536,7 @@ function RecentView({ config, onError }: { config: ClientConfig; onError: (value
 
   useEffect(() => {
     void load();
-  }, [config.baseUrl, config.apiKey]);
+  }, [config.baseUrl]);
 
   return (
     <div className="space-y-4">
@@ -580,7 +579,7 @@ function CollectionsView({ config, onError }: { config: ClientConfig; onError: (
 
   useEffect(() => {
     void load();
-  }, [config.baseUrl, config.apiKey]);
+  }, [config.baseUrl]);
 
   return (
     <div className="space-y-4">
@@ -636,7 +635,7 @@ function DigestView({ config, onError }: { config: ClientConfig; onError: (value
 
   useEffect(() => {
     void load();
-  }, [config.baseUrl, config.apiKey]);
+  }, [config.baseUrl]);
 
   return (
     <div className="space-y-4">
@@ -771,7 +770,7 @@ function TodoView({
 
   useEffect(() => {
     void load();
-  }, [config.baseUrl, config.apiKey]);
+  }, [config.baseUrl]);
 
   const openTodos = todos.filter((todo) => todo.status === 'open');
   const doneTodos = todos.filter((todo) => todo.status === 'done');
@@ -963,7 +962,7 @@ function LabelView({
 
   useEffect(() => {
     void load();
-  }, [config.baseUrl, config.apiKey]);
+  }, [config.baseUrl]);
 
   return (
     <div className="space-y-4">
@@ -1082,7 +1081,7 @@ function StatsView({
 
   useEffect(() => {
     void loadStats();
-  }, [config.baseUrl, config.apiKey]);
+  }, [config.baseUrl]);
 
   const keepCount = useMemo(() => stats?.noise_counts.find((item) => item.is_noise === 0)?.count || 0, [stats]);
   const noiseCount = useMemo(() => stats?.noise_counts.find((item) => item.is_noise === 1)?.count || 0, [stats]);
@@ -1134,14 +1133,12 @@ function SettingsView({
   config,
   onConfig,
   onHealth,
-  apiKeyEnabled,
   onError,
   onToast,
 }: {
   config: ClientConfig;
   onConfig: (value: ClientConfig) => void;
   onHealth: () => void;
-  apiKeyEnabled: boolean;
   onError: (value: string) => void;
   onToast: (value: string) => void;
 }) {
@@ -1189,7 +1186,7 @@ function SettingsView({
   useEffect(() => {
     void loadPrivacy();
     void loadStorage();
-  }, [config.baseUrl, config.apiKey]);
+  }, [config.baseUrl]);
 
   const savePrivacy = async () => {
     try {
@@ -1214,6 +1211,12 @@ function SettingsView({
   };
 
   const cleanupStorage = async (rebuildIndex = false) => {
+    const confirmed = window.confirm(
+      rebuildIndex
+        ? 'Clean up captured data and rebuild the search index?'
+        : 'Clean up captured data? This can permanently delete captures that match the current storage policy.',
+    );
+    if (!confirmed) return;
     try {
       const result = await api.cleanup(config, rebuildIndex);
       await loadStorage();
@@ -1246,6 +1249,10 @@ function SettingsView({
   const forgetCaptures = async () => {
     const hours = Math.max(1, Number(forgetHours) || 24);
     const from = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+    const scope = forgetSource ? `source type "${forgetSource}"` : 'all source types';
+    if (!window.confirm(`Permanently delete captures from the last ${hours} hours for ${scope}?`)) {
+      return;
+    }
     try {
       const result = await api.forget(config, {
         from_timestamp: from,
@@ -1293,19 +1300,6 @@ function SettingsView({
               onChange={(event) => onConfig({ ...config, baseUrl: event.target.value })}
             />
           </label>
-          <label className="field-label">
-            API Key
-            <input
-              className="settings-input"
-              value={config.apiKey}
-              onChange={(event) => onConfig({ ...config, apiKey: event.target.value })}
-              type="password"
-            />
-          </label>
-          <div className="flex items-center gap-2 text-sm text-slate-600">
-            <Shield size={16} />
-            <span>{apiKeyEnabled ? 'Enabled' : 'Disabled'}</span>
-          </div>
           <button className="command-button w-fit" onClick={onHealth} type="button">
             <RefreshCw size={16} />
             Check

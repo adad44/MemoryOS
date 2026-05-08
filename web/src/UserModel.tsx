@@ -68,7 +68,7 @@ export default function UserModel({
 
   useEffect(() => {
     void load();
-  }, [config.baseUrl, config.apiKey]);
+  }, [config.baseUrl]);
 
   const filteredBeliefs = useMemo(
     () => (filter === 'all' ? beliefs : beliefs.filter((belief) => belief.belief_type === filter)),

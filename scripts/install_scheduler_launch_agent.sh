@@ -4,6 +4,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PLIST="$HOME/Library/LaunchAgents/com.memoryos.scheduler.plist"
 LOG_DIR="$ROOT/.logs"
+DATA_DIR="${MEMORYOS_DATA_DIR:-$HOME/Library/Application Support/MemoryOS}"
+DB_PATH="${MEMORYOS_DB:-$DATA_DIR/memoryos.db}"
+MODEL="${MEMORYOS_OLLAMA_MODEL:-mistral}"
+PATH_VALUE="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 
 mkdir -p "$HOME/Library/LaunchAgents" "$LOG_DIR"
 
@@ -17,6 +21,17 @@ cat > "$PLIST" <<PLIST
   <string>com.memoryos.scheduler</string>
   <key>WorkingDirectory</key>
   <string>$ROOT</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>MEMORYOS_DATA_DIR</key>
+    <string>$DATA_DIR</string>
+    <key>MEMORYOS_DB</key>
+    <string>$DB_PATH</string>
+    <key>MEMORYOS_OLLAMA_MODEL</key>
+    <string>$MODEL</string>
+    <key>PATH</key>
+    <string>$PATH_VALUE</string>
+  </dict>
   <key>ProgramArguments</key>
   <array>
     <string>/usr/bin/env</string>
