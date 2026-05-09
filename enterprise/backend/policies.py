@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from typing import Any
 
@@ -110,7 +111,22 @@ def redact(text: str, policy: EnterprisePolicy) -> str:
         clean = term.strip()
         if not clean:
             continue
-        for candidate in {clean, clean.lower(), clean.upper(), clean.title()}:
-            redacted = redacted.replace(candidate, "[redacted]")
+        redacted = re.sub(re.escape(clean), "[redacted]", redacted, flags=re.IGNORECASE)
+    secret_patterns = [
+        r"(?i)\b(api[_-]?key|token|secret|password)\s*[:=]\s*['\"]?[^'\"\s,;]+",
+        r"\b[A-Za-z0-9_\-]{24,}\.[A-Za-z0-9_\-]{12,}\.[A-Za-z0-9_\-]{12,}\b",
+        r"\b(?:sk|pk|rk)_[A-Za-z0-9_]{16,}\b",
+    ]
+    for pattern in secret_patterns:
+        redacted = re.sub(pattern, "[redacted]", redacted)
     return redacted
 
+
+def redact_value(value: Any, policy: EnterprisePolicy) -> Any:
+    if isinstance(value, str):
+        return redact(value, policy)
+    if isinstance(value, list):
+        return [redact_value(item, policy) for item in value]
+    if isinstance(value, dict):
+        return {redact(str(key), policy): redact_value(item, policy) for key, item in value.items()}
+    return value

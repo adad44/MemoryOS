@@ -120,6 +120,7 @@ CREATE TABLE IF NOT EXISTS shared_memories (
   metadata TEXT NOT NULL DEFAULT '{}',
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   revoked_at DATETIME,
+  CHECK (team_id IS NOT NULL OR project_id IS NOT NULL),
   FOREIGN KEY(organization_id) REFERENCES organizations(id),
   FOREIGN KEY(team_id) REFERENCES teams(id),
   FOREIGN KEY(project_id) REFERENCES projects(id),
@@ -153,6 +154,7 @@ CREATE TABLE IF NOT EXISTS agent_access_grants (
   created_by_user_id INTEGER,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   last_used_at DATETIME,
+  CHECK (team_id IS NOT NULL OR project_id IS NOT NULL),
   FOREIGN KEY(organization_id) REFERENCES organizations(id),
   FOREIGN KEY(team_id) REFERENCES teams(id),
   FOREIGN KEY(project_id) REFERENCES projects(id),
@@ -195,4 +197,3 @@ def connect(path: str | None = None) -> sqlite3.Connection:
     conn.execute("PRAGMA foreign_keys = ON")
     conn.executescript(SCHEMA)
     return conn
-

@@ -120,3 +120,16 @@ def require_project_access(conn: sqlite3.Connection, principal: Principal, proje
     ).fetchone()
     if not membership:
         raise HTTPException(status_code=403, detail="User is not a member of this project.")
+
+
+def require_device_access(conn: sqlite3.Connection, principal: Principal, device_id: int, *, require_trusted: bool = False) -> None:
+    device = conn.execute(
+        "SELECT * FROM devices WHERE id = ? AND organization_id = ?",
+        (device_id, principal.organization_id),
+    ).fetchone()
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found in organization.")
+    if not is_org_admin(principal.role) and int(device["user_id"]) != principal.user_id:
+        raise HTTPException(status_code=403, detail="User cannot access this device.")
+    if require_trusted and device["trust_state"] != "trusted":
+        raise HTTPException(status_code=403, detail="Device is not trusted for team memory sync.")

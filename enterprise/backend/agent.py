@@ -7,10 +7,10 @@ from fastapi import HTTPException
 from .audit import log_event, now
 from .auth import bearer_token, hash_secret
 from .db import connect
-from .policies import active_policy, redact
+from .policies import active_policy
 from .rbac import ensure_project_in_org, ensure_team_in_org
 from .schemas import AgentContextRequest, AgentContextResponse
-from .sync import CAPTURE_COLUMNS, list_shared, local_memory_conn
+from .sync import list_shared
 
 
 def issue_agent_context(request: AgentContextRequest, authorization: Optional[str]) -> AgentContextResponse:
@@ -22,6 +22,8 @@ def issue_agent_context(request: AgentContextRequest, authorization: Optional[st
         ).fetchone()
         if not grant:
             raise HTTPException(status_code=403, detail="Invalid or inactive agent grant.")
+        if not bool(grant["can_read_shared"]):
+            raise HTTPException(status_code=403, detail="Agent grant cannot read shared memory.")
         conn.execute("UPDATE agent_access_grants SET last_used_at = ? WHERE id = ?", (now(), grant["id"]))
 
         grant_team_id = int(grant["team_id"]) if grant["team_id"] is not None else None
@@ -35,25 +37,12 @@ def issue_agent_context(request: AgentContextRequest, authorization: Optional[st
         project_id = request.project_id if request.project_id is not None else grant_project_id
         ensure_team_in_org(conn, int(grant["organization_id"]), team_id)
         ensure_project_in_org(conn, int(grant["organization_id"]), project_id, team_id)
+        if team_id is None and project_id is None:
+            raise HTTPException(status_code=403, detail="Agent grant requires a team or project scope.")
         shared = list_shared(conn, int(grant["organization_id"]), team_id, project_id, request.query, request.limit)
         policy = active_policy(conn, int(grant["organization_id"]))
-        private_recent = []
         if request.include_private_recent:
-            if not bool(grant["can_request_private"]):
-                raise HTTPException(status_code=403, detail="Agent grant cannot request private recent memory.")
-            with local_memory_conn() as local:
-                rows = local.execute(f"SELECT {CAPTURE_COLUMNS} FROM captures ORDER BY timestamp DESC LIMIT ?", (min(request.limit, 10),)).fetchall()
-            private_recent = [
-                {
-                    "id": int(row["id"]),
-                    "timestamp": str(row["timestamp"]),
-                    "app_name": str(row["app_name"]),
-                    "window_title": row["window_title"],
-                    "source_type": str(row["source_type"]),
-                    "snippet": redact(str(row["content"] or "")[:500], policy),
-                }
-                for row in rows
-            ]
+            raise HTTPException(status_code=403, detail="Enterprise agent grants cannot read private local memory.")
         audit_id = log_event(
             conn,
             int(grant["organization_id"]),
@@ -62,13 +51,20 @@ def issue_agent_context(request: AgentContextRequest, authorization: Optional[st
             "agent_context_read",
             "agent_context",
             grant["id"],
-            {"agent_name": grant["agent_name"], "shared_count": len(shared), "include_private_recent": request.include_private_recent},
+            {
+                "agent_name": grant["agent_name"],
+                "shared_count": len(shared),
+                "team_id": team_id,
+                "project_id": project_id,
+                "query_present": bool(request.query),
+                "include_private_recent": request.include_private_recent,
+            },
         )
         conn.commit()
         return AgentContextResponse(
             agent_name=str(grant["agent_name"]),
             shared_memories=shared,
-            private_recent=private_recent,
+            private_recent=[],
             policy_version=policy.version,
             audit_event_id=audit_id,
         )

@@ -19,7 +19,6 @@ Set these environment variables before starting the service:
 ```sh
 export MEMORYOS_ENTERPRISE_ENABLED=true
 export MEMORYOS_ENTERPRISE_DB=/var/lib/memoryos-enterprise/enterprise.db
-export MEMORYOS_LOCAL_DB="$HOME/Library/Application Support/MemoryOS/memoryos.db"
 export MEMORYOS_ENTERPRISE_BOOTSTRAP_TOKEN="replace-with-bootstrap-secret"
 export MEMORYOS_ENTERPRISE_OIDC_ISSUER="https://issuer.example.com"
 export MEMORYOS_ENTERPRISE_OIDC_AUDIENCE="memoryos-enterprise"
@@ -50,7 +49,7 @@ Run the end-to-end enterprise pipeline against disposable databases:
 .venv/bin/python scripts/smoke_enterprise_backend.py
 ```
 
-The smoke test verifies health, bootstrap, SSO/JWT role mapping, RBAC denial for auditor policy writes, policy sync, team/project memory sharing, redaction, scoped Hermes Agent access, scoped-grant denial, and audit export.
+The smoke test verifies health, blocked pre-bootstrap SSO access, bootstrap, SSO/JWT role mapping from provisioned users, RBAC denial for auditor policy writes, device ownership checks, policy sync, team/project memory sharing, redaction, non-member team-read denial, member team-read approval, scoped Hermes Agent access, scoped-grant denial, private-memory denial, and audit export.
 
 ## Bootstrap
 
@@ -69,24 +68,25 @@ curl -X POST http://127.0.0.1:8775/bootstrap \
   }'
 ```
 
-After bootstrap, enterprise users authenticate with SSO/JWT bearer tokens. The backend maps token claims into the MemoryOS organization:
+After bootstrap, admins provision enterprise users through `/admin/users`, then users authenticate with SSO/JWT bearer tokens. The backend uses token claims only to identify the organization and subject, then loads the stored enterprise role from the provisioned user row:
 
 - `sub`: required stable user subject.
 - `email` or `upn`: required user email.
 - `name`: optional display name.
 - `memoryos_org`, `org`, or `hd`: organization slug.
-- `memoryos_role` or `role`: one of `member`, `manager`, `admin`, `auditor`, or `owner`.
+- Role claims are not trusted as authorization by default; provisioned server-side user roles decide access.
 
 ## Core Flow
 
-1. Admin publishes a policy with `/admin/policy`.
-2. Employee devices call `/sync/devices` and `/sync/policy`.
-3. Employees share approved local captures through `/sync/share`.
-4. Teammates read allowed shared memory through `/sync/shared`.
-5. Admins create Hermes Agent grants with `/admin/agent-grants`.
-6. Hermes Agent reads bounded enterprise context through `/agent/context`.
-7. Auditors export evidence through `/audit/export?format=jsonl` or `/audit/export?format=csv`.
+1. Admin provisions users with `/admin/users`.
+2. Admin publishes a policy with `/admin/policy`.
+3. Employee devices call `/sync/devices` and `/sync/policy`.
+4. Employee-side sync workers post approved capture payloads through `/sync/share`; the enterprise service validates device ownership/trust, redacts, stores, and audits the shared memory.
+5. Teammates read allowed shared memory through `/sync/shared`.
+6. Admins create scoped Hermes Agent grants with `/admin/agent-grants`.
+7. Hermes Agent reads bounded enterprise context through `/agent/context`.
+8. Auditors export evidence through `/audit/export?format=jsonl` or `/audit/export?format=csv`.
 
 ## Trust Boundary
 
-Personal MemoryOS remains local and employee-visible. The enterprise backend only receives memories that are explicitly shared or allowed by company policy. Shared memories are redacted before they are stored in the enterprise database, and every share, agent read, policy publish, and audit export is recorded in `audit_events`.
+Personal MemoryOS remains local and employee-visible. The enterprise backend only receives approved capture payloads posted by the employee-side sync worker; it does not read private local SQLite databases directly. Shared memories are redacted before they are stored in the enterprise database, and every share, agent read, policy publish, and audit export is recorded in `audit_events`.

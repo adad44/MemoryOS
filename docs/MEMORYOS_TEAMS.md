@@ -23,12 +23,12 @@ Implemented now:
 - SSO/OIDC hooks through JWKS-backed JWT validation or HS256 JWT validation for controlled deployments.
 - Bootstrap token for first organization setup.
 - Organization, user, device, team, project, membership, policy, shared-memory, sync-event, agent-grant, and audit-event tables.
-- RBAC dependencies for member, manager, admin, auditor, and owner roles.
+- Provisioned-user RBAC for member, manager, admin, auditor, and owner roles; token role claims do not override stored enterprise roles.
 - Membership-aware access controls for team/project shared memory.
 - Admin policy publishing with versioned policies.
 - Device policy sync that renders local `privacy.json` and storage policy shapes.
-- Team memory sync from local MemoryOS captures into redacted shared memory.
-- Scoped Hermes Agent grants and `/agent/context` access that cannot read outside the grant's team/project scope.
+- Team memory sync from employee-side approved capture payloads into redacted shared memory.
+- Scoped Hermes Agent grants and `/agent/context` access that cannot read outside the grant's team/project scope or read private local memory.
 - JSONL and CSV audit exports.
 
 Required production configuration:
@@ -37,7 +37,6 @@ Required production configuration:
 - Enterprise DB path or managed database connection strategy through `MEMORYOS_ENTERPRISE_DB`
 - OIDC issuer, audience, and JWKS URL, or a deployment-managed HS256 JWT secret
 - Bootstrap token for first organization setup
-- Local MemoryOS DB path for sync workers through `MEMORYOS_LOCAL_DB`
 - TLS, reverse proxy, secret storage, backup policy, monitoring, and deployment hardening supplied by the enterprise environment
 
 ## Product Positioning
@@ -59,10 +58,10 @@ The enterprise pipeline works in this order:
 
 1. **Personal MemoryOS stays local**: each employee keeps a private local memory on their work machine.
 2. **Enterprise policy service**: admins define approved capture sources, exclusions, retention, redaction, sharing, and sync rules.
-3. **Identity and access**: organization, employee, team, project, role, and device state control access.
-4. **Team memory sync**: selected or policy-approved captures are promoted from private memory into shared project memory.
+3. **Identity and access**: provisioned organization, employee, team, project, role, and device state control access.
+4. **Team memory sync**: the employee-side sync worker posts selected or policy-approved captures into shared project memory.
 5. **Hermes Agent connector**: approved agents request bounded context by team or project through scoped grants.
-6. **Admin dashboard**: companies manage policies, teams, shared memories, audit logs, retention, and access reviews.
+6. **Admin control plane**: companies manage policies, teams, shared memories, audit logs, retention, and access reviews through the enterprise API today, with a dedicated web console as the next product surface.
 7. **Enterprise security**: encryption, redaction, SSO, device trust, export/delete controls, and audit trails make the system acceptable for real organizations.
 
 Every step must preserve the product rule: employees own private work memory, companies own shared project memory, and policies decide what crosses the boundary.
@@ -227,11 +226,11 @@ Included:
 - Shared team memory is stored separately as redacted `shared_memories`.
 - Admin-managed policy publishing and device policy sync.
 - Hermes Agent context endpoint for scoped team/project context.
-- Audit rows for bootstrap, policy publish, device registration, team/project creation, memory share, agent grant, agent context read, and audit export.
+- Audit rows for bootstrap, user provisioning, policy publish, device registration, team/project creation, memory share, agent grant, agent context read, and audit export.
 
 Still recommended next:
 
-- Dedicated enterprise admin web console.
+- Dedicated enterprise admin web console on top of the current admin API.
 - SAML/OIDC provider mapping templates for Okta, Microsoft Entra, and Google Workspace.
 - SCIM provisioning.
 - Managed KMS and envelope encryption.
@@ -277,6 +276,7 @@ Agent access is policy-bound, auditable, and scoped to the team/project grant cr
 - `GET /admin/overview`
 - `GET /admin/policy`
 - `PUT /admin/policy`
+- `POST /admin/users`
 - `POST /admin/teams`
 - `POST /admin/teams/{team_id}/members`
 - `POST /admin/projects`

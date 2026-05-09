@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import secrets
+import socket
 import subprocess
 import sys
 import tempfile
@@ -17,8 +18,6 @@ import jwt
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-
-from ml.memoryos.db import connect as connect_local_memory  # noqa: E402
 
 
 def request(method: str, url: str, data: dict[str, Any] | None = None, token: str | None = None, expect: int = 200) -> Any:
@@ -55,26 +54,21 @@ def token(secret: str, role: str, subject: str, email: str) -> str:
     )
 
 
+def free_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return int(sock.getsockname()[1])
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory(prefix="memoryos-enterprise-smoke-") as tmp:
         tmp_path = Path(tmp)
         enterprise_db = tmp_path / "enterprise.db"
-        local_db = tmp_path / "local-memoryos.db"
-        port = int(os.environ.get("MEMORYOS_ENTERPRISE_SMOKE_PORT", "8899"))
+        port = int(os.environ.get("MEMORYOS_ENTERPRISE_SMOKE_PORT") or free_port())
         base = f"http://127.0.0.1:{port}"
         bootstrap_token = secrets.token_urlsafe(32)
         jwt_secret = secrets.token_urlsafe(48)
         agent_token = secrets.token_urlsafe(32)
-
-        with connect_local_memory(local_db) as conn:
-            conn.execute(
-                """
-                INSERT INTO captures (timestamp, app_name, window_title, content, source_type, url, file_path, is_noise, is_pinned)
-                VALUES (CURRENT_TIMESTAMP, 'Slack', 'Enterprise launch', ?, 'chat', NULL, NULL, 0, 0)
-                """,
-                ("Launch blocker: rotate the secret before customer pilot.",),
-            )
-            conn.commit()
 
         env = os.environ.copy()
         env.update(
@@ -82,7 +76,6 @@ def main() -> int:
                 "PYTHONPATH": str(ROOT),
                 "MEMORYOS_ENTERPRISE_ENABLED": "true",
                 "MEMORYOS_ENTERPRISE_DB": str(enterprise_db),
-                "MEMORYOS_LOCAL_DB": str(local_db),
                 "MEMORYOS_ENTERPRISE_BOOTSTRAP_TOKEN": bootstrap_token,
                 "MEMORYOS_ENTERPRISE_JWT_HS256_SECRET": jwt_secret,
                 "MEMORYOS_ENTERPRISE_OIDC_AUDIENCE": "memoryos-enterprise",
@@ -110,6 +103,9 @@ def main() -> int:
 
             owner = token(jwt_secret, "owner", "owner-subject", "owner@acme.example")
             auditor = token(jwt_secret, "auditor", "auditor-subject", "auditor@acme.example")
+            member = token(jwt_secret, "member", "member-subject", "member@acme.example")
+            forged_member = token(jwt_secret, "owner", "member-subject", "member@acme.example")
+            request("GET", f"{base}/auth/me", token=owner, expect=403)
 
             request(
                 "POST",
@@ -124,6 +120,31 @@ def main() -> int:
                 bootstrap_token,
             )
             request("GET", f"{base}/auth/me", token=owner)
+            member_principal = request(
+                "POST",
+                f"{base}/admin/users",
+                {
+                    "subject": "member-subject",
+                    "email": "member@acme.example",
+                    "name": "Member User",
+                    "role": "member",
+                },
+                owner,
+            )
+            request(
+                "POST",
+                f"{base}/admin/users",
+                {
+                    "subject": "auditor-subject",
+                    "email": "auditor@acme.example",
+                    "name": "Auditor User",
+                    "role": "auditor",
+                },
+                owner,
+            )
+            member_me = request("GET", f"{base}/auth/me", token=forged_member)
+            if member_me["role"] != "member":
+                raise AssertionError("JWT role claim overrode provisioned member role.")
             team = request("POST", f"{base}/admin/teams", {"name": "Product"}, owner)
             project = request("POST", f"{base}/admin/projects", {"team_id": team["id"], "name": "Enterprise Pilot"}, owner)
             request(
@@ -152,15 +173,40 @@ def main() -> int:
             policy = request("GET", f"{base}/sync/policy?device_id={device['id']}", token=owner)
             if policy["privacy_settings"]["blocked_apps"] != ["Personal Notes"]:
                 raise AssertionError("Policy sync did not render local privacy settings.")
+            request("GET", f"{base}/sync/policy?device_id={device['id']}", token=member, expect=403)
 
             shared = request(
                 "POST",
                 f"{base}/sync/share",
-                {"local_capture_id": 1, "team_id": team["id"], "project_id": project["id"], "summary": "Contains secret"},
+                {
+                    "local_capture_id": 1,
+                    "device_id": device["id"],
+                    "content": "Launch blocker: rotate the secret before customer pilot.",
+                    "team_id": team["id"],
+                    "project_id": project["id"],
+                    "title": "Contains secret title",
+                    "summary": "Contains secret",
+                    "app_name": "Slack",
+                    "window_title": "Enterprise secret launch",
+                    "source_type": "chat",
+                    "url": "https://example.test/secret",
+                    "metadata": {"note": "secret metadata"},
+                },
                 owner,
             )
-            if "secret" in shared["summary"].lower() or "secret" in shared["redacted_content"].lower():
+            shared_text = json.dumps(shared).lower()
+            if "secret" in shared_text:
                 raise AssertionError("Shared memory was not redacted.")
+            request("GET", f"{base}/sync/shared?team_id={team['id']}", token=member, expect=403)
+            request(
+                "POST",
+                f"{base}/admin/teams/{team['id']}/members",
+                {"user_id": member_principal["id"], "role": "member"},
+                owner,
+            )
+            member_shared = request("GET", f"{base}/sync/shared?team_id={team['id']}", token=member)
+            if not member_shared:
+                raise AssertionError("Team member could not read shared team memory.")
 
             grant = request(
                 "POST",
@@ -170,6 +216,20 @@ def main() -> int:
             )
             if grant["agent_name"] != "Hermes Agent":
                 raise AssertionError("Hermes grant was not created.")
+            request(
+                "POST",
+                f"{base}/admin/agent-grants",
+                {"agent_name": "Hermes Agent", "token": secrets.token_urlsafe(32)},
+                owner,
+                expect=422,
+            )
+            request(
+                "POST",
+                f"{base}/admin/agent-grants",
+                {"agent_name": "Hermes Agent", "token": secrets.token_urlsafe(32), "team_id": team["id"], "can_request_private": True},
+                owner,
+                expect=422,
+            )
 
             context = request(
                 "POST",
@@ -186,13 +246,19 @@ def main() -> int:
                 agent_token,
                 expect=403,
             )
+            request(
+                "POST",
+                f"{base}/agent/context",
+                {"team_id": team["id"], "project_id": project["id"], "include_private_recent": True},
+                agent_token,
+                expect=403,
+            )
 
             audit_request = urllib.request.Request(
                 f"{base}/audit/export?format=jsonl",
                 headers={"Authorization": f"Bearer {auditor}"},
                 method="GET",
             )
-            urllib.request.urlopen(audit_request, timeout=10).read()
             audit_jsonl = urllib.request.urlopen(audit_request, timeout=10).read().decode("utf-8")
             for expected in ["memory_shared", "agent_context_read", "audit_exported"]:
                 if expected not in audit_jsonl:

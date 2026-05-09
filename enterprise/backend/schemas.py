@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class Principal(BaseModel):
@@ -60,6 +60,14 @@ class TeamRequest(BaseModel):
     description: Optional[str] = Field(default=None, max_length=500)
 
 
+class UserRequest(BaseModel):
+    subject: str = Field(min_length=1, max_length=240)
+    email: str = Field(min_length=3, max_length=254)
+    name: str = Field(min_length=1, max_length=120)
+    role: str = Field(default="member", pattern="^(member|manager|admin|owner|auditor)$")
+    status: Literal["active", "suspended"] = "active"
+
+
 class ProjectRequest(BaseModel):
     team_id: int
     name: str = Field(min_length=1, max_length=160)
@@ -79,11 +87,24 @@ class DeviceRequest(BaseModel):
 
 class ShareMemoryRequest(BaseModel):
     local_capture_id: int
+    device_id: int
+    content: str = Field(min_length=1, max_length=100000)
     team_id: Optional[int] = None
     project_id: Optional[int] = None
     title: Optional[str] = Field(default=None, max_length=300)
     summary: Optional[str] = Field(default=None, max_length=2000)
+    app_name: Optional[str] = Field(default=None, max_length=180)
+    window_title: Optional[str] = Field(default=None, max_length=300)
+    source_type: Optional[str] = Field(default=None, max_length=80)
+    url: Optional[str] = Field(default=None, max_length=2000)
+    file_path: Optional[str] = Field(default=None, max_length=2000)
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def require_scope(self) -> "ShareMemoryRequest":
+        if self.team_id is None and self.project_id is None:
+            raise ValueError("Team memory sync requires a team_id or project_id.")
+        return self
 
 
 class SharedMemory(BaseModel):
@@ -108,6 +129,12 @@ class AgentGrantRequest(BaseModel):
     project_id: Optional[int] = None
     can_request_private: bool = False
 
+    @model_validator(mode="after")
+    def require_scope(self) -> "AgentGrantRequest":
+        if self.team_id is None and self.project_id is None:
+            raise ValueError("Agent grants require a team_id or project_id.")
+        return self
+
 
 class AgentContextRequest(BaseModel):
     query: Optional[str] = Field(default=None, max_length=1000)
@@ -129,4 +156,3 @@ class AuditExport(BaseModel):
     exported_at: str
     count: int
     events: list[dict[str, Any]]
-

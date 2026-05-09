@@ -3,31 +3,14 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
-from pathlib import Path
 from typing import Any, Optional
 
 from fastapi import HTTPException
 
 from .audit import log_event, now, row_dict
-from .config import load_settings
-from .policies import active_policy, json_text, redact, render_local_privacy_settings, render_local_storage_policy
-from .rbac import ensure_project_in_org, require_project_access, require_team_access
+from .policies import active_policy, json_text, redact, redact_value, render_local_privacy_settings, render_local_storage_policy
+from .rbac import ensure_project_in_org, require_device_access, require_project_access, require_team_access
 from .schemas import Principal, ShareMemoryRequest, SharedMemory
-
-
-CAPTURE_COLUMNS = "id, timestamp, app_name, window_title, content, source_type, url, file_path, is_noise, is_pinned"
-
-
-def local_memory_conn() -> sqlite3.Connection:
-    db_path = load_settings().local_memoryos_db
-    if not db_path:
-        raise HTTPException(status_code=503, detail="MEMORYOS_LOCAL_DB is required for team memory sync.")
-    path = Path(db_path).expanduser()
-    if not path.exists():
-        raise HTTPException(status_code=404, detail=f"Local MemoryOS DB not found: {path}")
-    conn = sqlite3.connect(str(path), timeout=30)
-    conn.row_factory = sqlite3.Row
-    return conn
 
 
 def shared_memory_from_row(row: sqlite3.Row) -> SharedMemory:
@@ -55,6 +38,7 @@ def shared_memory_from_row(row: sqlite3.Row) -> SharedMemory:
 def policy_for_device(conn: sqlite3.Connection, principal: Principal, device_id: Optional[int]) -> dict[str, Any]:
     policy = active_policy(conn, principal.organization_id)
     if device_id is not None:
+        require_device_access(conn, principal, device_id)
         conn.execute("UPDATE devices SET policy_version = ?, last_seen_at = ? WHERE id = ? AND organization_id = ?", (policy.version, now(), device_id, principal.organization_id))
         log_event(conn, principal.organization_id, principal.user_id, "user", "policy_synced", "device", device_id, {"policy_version": policy.version})
         conn.commit()
@@ -72,18 +56,24 @@ def share_local_capture(conn: sqlite3.Connection, principal: Principal, request:
     require_team_access(conn, principal, request.team_id)
     ensure_project_in_org(conn, principal.organization_id, request.project_id, request.team_id)
     require_project_access(conn, principal, request.project_id)
+    require_device_access(conn, principal, request.device_id, require_trusted=True)
 
-    with local_memory_conn() as local:
-        capture = local.execute(f"SELECT {CAPTURE_COLUMNS} FROM captures WHERE id = ?", (request.local_capture_id,)).fetchone()
-    if not capture:
-        raise HTTPException(status_code=404, detail="Local capture not found.")
-    if int(capture["is_noise"] or 0) == 1:
-        raise HTTPException(status_code=422, detail="Noise captures cannot be synced to team memory.")
-
-    content = str(capture["content"] or "")
+    content = request.content
     redacted_content = redact(content, policy)
     summary = redact(request.summary or redacted_content[:500], policy)
-    title = request.title or capture["window_title"] or capture["url"] or f"Capture {request.local_capture_id}"
+    title = redact(request.title or request.window_title or request.url or f"Capture {request.local_capture_id}", policy)
+    metadata = redact_value(
+        {
+            **request.metadata,
+            "app_name": request.app_name,
+            "window_title": request.window_title,
+            "source_type": request.source_type,
+            "url": request.url,
+            "file_path": request.file_path,
+            "device_id": request.device_id,
+        },
+        policy,
+    )
     source_hash = hashlib.sha256(f"{request.local_capture_id}:{content}".encode("utf-8")).hexdigest()
     cursor = conn.execute(
         """
@@ -103,18 +93,34 @@ def share_local_capture(conn: sqlite3.Connection, principal: Principal, request:
             title,
             summary,
             redacted_content,
-            json_text(request.metadata),
+            json_text(metadata),
         ),
     )
     shared_id = int(cursor.lastrowid)
     conn.execute(
         """
-        INSERT INTO memory_sync_events (organization_id, shared_memory_id, event_type, status, details)
-        VALUES (?, ?, 'share', 'complete', ?)
+        INSERT INTO memory_sync_events (organization_id, shared_memory_id, device_id, event_type, status, details)
+        VALUES (?, ?, ?, 'share', 'complete', ?)
         """,
-        (principal.organization_id, shared_id, json_text({"local_capture_id": request.local_capture_id})),
+        (principal.organization_id, shared_id, request.device_id, json_text({"local_capture_id": request.local_capture_id})),
     )
-    log_event(conn, principal.organization_id, principal.user_id, "user", "memory_shared", "shared_memory", shared_id, {"local_capture_id": request.local_capture_id, "policy_version": policy.version})
+    log_event(
+        conn,
+        principal.organization_id,
+        principal.user_id,
+        "user",
+        "memory_shared",
+        "shared_memory",
+        shared_id,
+        {
+            "local_capture_id": request.local_capture_id,
+            "device_id": request.device_id,
+            "team_id": request.team_id,
+            "project_id": request.project_id,
+            "policy_version": policy.version,
+            "redaction_terms": len(policy.redaction_terms),
+        },
+    )
     conn.commit()
     return shared_memory_from_row(conn.execute("SELECT * FROM shared_memories WHERE id = ?", (shared_id,)).fetchone())
 

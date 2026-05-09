@@ -13,7 +13,7 @@ from .auth import hash_secret, require_bootstrap_token
 from .config import load_settings
 from .db import connect
 from .policies import active_policy, publish_policy
-from .rbac import ensure_project_in_org, ensure_team_in_org, ensure_user_in_org, require_project_access, require_role, require_team_access
+from .rbac import ensure_project_in_org, ensure_team_in_org, ensure_user_in_org, is_org_admin, require_project_access, require_role, require_team_access
 from .schemas import (
     AgentContextRequest,
     AgentContextResponse,
@@ -30,6 +30,7 @@ from .schemas import (
     ShareMemoryRequest,
     SharedMemory,
     TeamRequest,
+    UserRequest,
 )
 from .sync import list_shared, policy_for_device, share_local_capture
 
@@ -132,6 +133,36 @@ def put_policy(request: EnterprisePolicy, principal: Principal = Depends(require
         return policy
 
 
+@app.post("/admin/users")
+def provision_user(request: UserRequest, principal: Principal = Depends(require_role("admin"))) -> dict[str, Any]:
+    with connect() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO users (organization_id, subject, email, name, role, status)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(organization_id, subject)
+            DO UPDATE SET email = excluded.email, name = excluded.name, role = excluded.role, status = excluded.status
+            """,
+            (principal.organization_id, request.subject, request.email, request.name, request.role, request.status),
+        )
+        user = conn.execute(
+            "SELECT id, email, name, role, status, last_seen_at, created_at FROM users WHERE organization_id = ? AND subject = ?",
+            (principal.organization_id, request.subject),
+        ).fetchone()
+        log_event(
+            conn,
+            principal.organization_id,
+            principal.user_id,
+            "user",
+            "user_provisioned",
+            "user",
+            user["id"] if user else cursor.lastrowid,
+            {"subject": request.subject, "role": request.role, "status": request.status},
+        )
+        conn.commit()
+        return row_dict(user)
+
+
 @app.post("/admin/teams")
 def create_team(request: TeamRequest, principal: Principal = Depends(require_role("manager"))) -> dict[str, Any]:
     with connect() as conn:
@@ -174,15 +205,16 @@ def create_project(request: ProjectRequest, principal: Principal = Depends(requi
 def register_device(request: DeviceRequest, principal: Principal = Depends(require_role("member"))) -> dict[str, Any]:
     with connect() as conn:
         public_key_hash = hash_secret(request.public_key) if request.public_key else None
+        trust_state = request.trust_state if is_org_admin(principal.role) else "pending"
         cursor = conn.execute(
             """
             INSERT INTO devices (organization_id, user_id, device_name, trust_state, public_key_hash, last_seen_at)
             VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (principal.organization_id, principal.user_id, request.device_name, request.trust_state, public_key_hash, now()),
+            (principal.organization_id, principal.user_id, request.device_name, trust_state, public_key_hash, now()),
         )
         device_id = int(cursor.lastrowid)
-        log_event(conn, principal.organization_id, principal.user_id, "user", "device_registered", "device", device_id, {"trust_state": request.trust_state})
+        log_event(conn, principal.organization_id, principal.user_id, "user", "device_registered", "device", device_id, {"trust_state": trust_state})
         conn.commit()
         return row_dict(conn.execute("SELECT * FROM devices WHERE id = ?", (device_id,)).fetchone())
 
@@ -220,6 +252,8 @@ def shared_memory(
 @app.post("/admin/agent-grants")
 def create_agent_grant(request: AgentGrantRequest, principal: Principal = Depends(require_role("admin"))) -> dict[str, Any]:
     with connect() as conn:
+        if request.can_request_private:
+            raise HTTPException(status_code=422, detail="Enterprise agent grants cannot read private local memory.")
         ensure_team_in_org(conn, principal.organization_id, request.team_id)
         ensure_project_in_org(conn, principal.organization_id, request.project_id, request.team_id)
         cursor = conn.execute(
@@ -260,12 +294,12 @@ def audit_export(
     principal: Principal = Depends(require_role("auditor")),
 ) -> Response:
     with connect() as conn:
+        log_event(conn, principal.organization_id, principal.user_id, "user", "audit_exported", "audit_event", None, {"format": format, "limit": limit})
+        conn.commit()
         rows = [
             parse_details(row_dict(row))
             for row in conn.execute("SELECT * FROM audit_events WHERE organization_id = ? ORDER BY created_at DESC LIMIT ?", (principal.organization_id, limit))
         ]
-        log_event(conn, principal.organization_id, principal.user_id, "user", "audit_exported", "audit_event", None, {"format": format, "count": len(rows)})
-        conn.commit()
     if format == "jsonl":
         content = "\n".join(json.dumps(row, separators=(",", ":")) for row in rows) + ("\n" if rows else "")
         return Response(content=content, media_type="application/x-ndjson")

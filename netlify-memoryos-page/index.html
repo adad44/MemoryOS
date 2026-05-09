@@ -797,7 +797,7 @@
             MemoryOS Teams now has a separate enterprise backend foundation for companies that want SSO, admin policy sync, team memory sync, RBAC, audit exports, and Hermes Agent enterprise access while keeping each employee's private MemoryOS local.
           </p>
           <div class="teams-note">
-            Separate product track: Teams is not mixed into the personal localhost MemoryOS app. Enterprises run the organization layer separately and connect it to their IdP, deployment controls, and local MemoryOS databases.
+            Separate product track: Teams is not mixed into the personal localhost MemoryOS app. Enterprises run the organization layer separately and connect it to their IdP, deployment controls, and employee-side sync workers.
           </div>
           <div class="teams-note">
             Product rule: employees own private work memory, companies own shared project memory, and policies decide what crosses the boundary.
@@ -811,7 +811,7 @@
               <span class="teams-label">Setup</span>
               <div>
                 <h3>SSO and company policy</h3>
-                <p>Admins connect OIDC/JWT auth, bootstrap the organization, define capture sources, exclusions, retention, team workspaces, role rules, and audit requirements.</p>
+                <p>Admins connect OIDC/JWT auth, bootstrap the organization, provision users, define capture sources, exclusions, retention, team workspaces, role rules, and audit requirements.</p>
               </div>
             </li>
             <li class="teams-step">
@@ -863,7 +863,7 @@
           </div>
           <div class="teams-panel" id="teams-agent-api">
             <h3>Production deployment shape</h3>
-            <p>Enterprise pilots can self-host the Teams backend behind company TLS, SSO, secret storage, backups, and monitoring. The local MemoryOS app remains the private source of truth, while approved memory syncs into the company-controlled layer.</p>
+            <p>Enterprise pilots can self-host the Teams backend behind company TLS, SSO, secret storage, backups, and monitoring. The local MemoryOS app remains the private source of truth, while employee-side sync workers send only approved memory into the company-controlled layer.</p>
             <div class="teams-examples" aria-label="Example team memory questions">
               <div class="teams-example">What changed on the Acme account this week?</div>
               <div class="teams-example">Who owns the launch blockers?</div>

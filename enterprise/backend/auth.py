@@ -26,6 +26,8 @@ def bearer_token(authorization: Optional[str]) -> str:
 
 def require_bootstrap_token(authorization: Optional[str] = Header(default=None)) -> None:
     settings = load_settings()
+    if not settings.enabled:
+        raise HTTPException(status_code=503, detail="Enterprise mode is disabled.")
     if not settings.bootstrap_token:
         raise HTTPException(status_code=503, detail="Enterprise bootstrap token is not configured.")
     token = bearer_token(authorization)
@@ -64,41 +66,29 @@ def current_principal(authorization: Optional[str] = Header(default=None)) -> Pr
 
     settings = load_settings()
     org_slug = str(claims.get("memoryos_org") or claims.get("org") or claims.get("hd") or settings.default_org_slug)
-    role = str(claims.get("memoryos_role") or claims.get("role") or "member")
-    if role not in {"member", "manager", "admin", "owner", "auditor"}:
-        role = "member"
 
     with connect() as conn:
         org = conn.execute("SELECT * FROM organizations WHERE slug = ?", (org_slug,)).fetchone()
         if not org:
-            cursor = conn.execute(
-                "INSERT INTO organizations (name, slug, sso_issuer, sso_audience) VALUES (?, ?, ?, ?)",
-                (org_slug.replace("-", " ").title(), org_slug, settings.oidc_issuer, settings.oidc_audience),
-            )
-            organization_id = int(cursor.lastrowid)
-        else:
-            organization_id = int(org["id"])
+            raise HTTPException(status_code=403, detail="Organization is not provisioned.")
+        if org["sso_issuer"] and settings.oidc_issuer and org["sso_issuer"] != settings.oidc_issuer:
+            raise HTTPException(status_code=403, detail="SSO issuer does not match organization configuration.")
+        if org["sso_audience"] and settings.oidc_audience and org["sso_audience"] != settings.oidc_audience:
+            raise HTTPException(status_code=403, detail="SSO audience does not match organization configuration.")
+        organization_id = int(org["id"])
 
         user = conn.execute(
             "SELECT * FROM users WHERE organization_id = ? AND subject = ?",
             (organization_id, subject),
         ).fetchone()
-        if user:
-            user_id = int(user["id"])
-            conn.execute(
-                "UPDATE users SET email = ?, name = ?, role = ?, last_seen_at = ? WHERE id = ?",
-                (email, name, role, now(), user_id),
-            )
-        else:
-            cursor = conn.execute(
-                """
-                INSERT INTO users (organization_id, subject, email, name, role, last_seen_at)
-                VALUES (?, ?, ?, ?, ?, ?)
-                """,
-                (organization_id, subject, email, name, role, now()),
-            )
-            user_id = int(cursor.lastrowid)
+        if not user or user["status"] != "active":
+            raise HTTPException(status_code=403, detail="User is not provisioned for this organization.")
+        user_id = int(user["id"])
+        role = str(user["role"])
+        conn.execute(
+            "UPDATE users SET email = ?, name = ?, last_seen_at = ? WHERE id = ?",
+            (email, name, now(), user_id),
+        )
         conn.commit()
 
     return Principal(organization_id=organization_id, user_id=user_id, subject=subject, email=email, name=name, role=role)
-
