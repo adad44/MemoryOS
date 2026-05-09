@@ -259,10 +259,4 @@ Remaining release work includes training production models on real labeled data,
 - [Deployment](docs/DEPLOYMENT.md)
 - [Demo script](docs/DEMO_SCRIPT.md)
 - [SQLite schema](docs/schema.sql)
-- [Phase 1 notes](docs/PHASE1.md)
-- [Phase 2 notes](docs/PHASE2.md)
-- [Phase 3 notes](docs/PHASE3.md)
-- [Phase 4 notes](docs/PHASE4.md)
-- [Phase 5 notes](docs/PHASE5.md)
-- [Phase 6 notes](docs/PHASE6.md)
-- [Phase 7 notes](docs/PHASE7.md)
+
