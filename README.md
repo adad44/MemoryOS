@@ -21,15 +21,15 @@ The short version: run MemoryOS locally, collect a small amount of context, buil
 - TF-IDF search that works immediately, plus hooks for sentence-transformer and FAISS indexing.
 - Storage controls for retention, auto-noise rules, cleanup, and protected useful captures.
 
-## Soon: MemoryOS for Teams
+## MemoryOS Teams Enterprise
 
-MemoryOS is being designed to expand from personal work memory into a team and enterprise memory layer. The goal is to give every employee a private work memory while giving teams a controlled way to share approved project context with coworkers and AI agents.
+MemoryOS Teams Enterprise is the separate enterprise product surface for MemoryOS. It expands personal work memory into a team and enterprise memory layer while keeping the private local MemoryOS install separate from the company control plane.
 
-Teams is a separate roadmap product track, not part of the current local MemoryOS install.
+Teams is not mixed into the personal localhost MemoryOS app. The enterprise backend lives under [enterprise/](enterprise/) and provides the foundation for SSO/JWT auth, admin policy sync, team memory sync, RBAC, audit exports, and Hermes Agent enterprise access.
 
 The full product sequence and enterprise plan live in [docs/MEMORYOS_TEAMS.md](docs/MEMORYOS_TEAMS.md).
 
-In a team setup, MemoryOS would help companies:
+In a team setup, MemoryOS helps companies:
 
 - Keep employee AI agents, including Hermes Agent, caught up with each worker's current projects, meetings, documents, tickets, and decisions.
 - Build shared project memory from approved captures, meeting summaries, docs, chats, PRs, customer notes, and follow-ups.
@@ -42,7 +42,7 @@ The enterprise version should stay private-first:
 - Personal work memory stays local and employee-visible by default.
 - Shared team memory only includes approved or policy-allowed context.
 - Admins can manage capture sources, app and domain exclusions, retention, redaction, access control, and audit logs.
-- Companies can connect MemoryOS to identity providers, team workspaces, project permissions, and agent access policies.
+- Companies can connect MemoryOS to identity providers, team workspaces, project permissions, audit exports, and agent access policies.
 
 The long-term direction is simple: MemoryOS becomes the memory layer for humans and workplace agents, so teams stop losing context across meetings, tools, handoffs, and daily work.
 
@@ -197,6 +197,7 @@ memoryos/
 ├── extension/       # Chrome extension for browser capture
 ├── daemon/          # Swift background capture process
 ├── menubar/         # Swift menu bar app
+├── enterprise/      # Separate MemoryOS Teams enterprise backend
 ├── ml/              # Search/indexing and model training code
 ├── docs/            # Setup, architecture, deployment, phase notes
 ├── scripts/         # Build, run, install, benchmark, export helpers

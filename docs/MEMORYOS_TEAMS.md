@@ -1,6 +1,6 @@
-# MemoryOS for Teams
+# MemoryOS Teams Enterprise
 
-MemoryOS for Teams is the planned enterprise version of MemoryOS. The product direction is to keep the local-first personal memory model, then add an organization layer that lets employees, teams, and workplace AI agents share approved context without turning MemoryOS into employee surveillance software.
+MemoryOS Teams Enterprise is the separate enterprise product surface for MemoryOS. It keeps the local-first personal memory model, then adds an organization layer that lets employees, teams, and workplace AI agents share approved context without turning MemoryOS into employee surveillance software.
 
 The core product rule:
 
@@ -12,13 +12,37 @@ Policies decide what crosses the boundary.
 
 ## Current Status
 
-MemoryOS for Teams is a roadmap product and should stay separate from the current local MemoryOS install until the enterprise surface is ready. The current app proves the personal memory layer: local capture, local search, local controls, and agent-readable context. The Teams product adds organization identity, shared project memory, admin policy, and audited agent access on top of that foundation.
+MemoryOS Teams now has a separate enterprise backend foundation under `enterprise/backend`. It is not mixed into the personal localhost MemoryOS app. Enterprises can self-host this backend and configure SSO/JWT validation, RBAC, admin policy sync, team memory sync, audit exports, and Hermes Agent enterprise access.
 
-The public Netlify page should describe what Teams can become without implying that SSO, RBAC, cross-device sync, or company-wide agent access already ship in the local installer.
+Operator setup notes live in [enterprise/README.md](../enterprise/README.md).
+The end-to-end verification script is `scripts/smoke_enterprise_backend.py`.
+
+Implemented now:
+
+- Separate FastAPI enterprise backend.
+- SSO/OIDC hooks through JWKS-backed JWT validation or HS256 JWT validation for controlled deployments.
+- Bootstrap token for first organization setup.
+- Organization, user, device, team, project, membership, policy, shared-memory, sync-event, agent-grant, and audit-event tables.
+- RBAC dependencies for member, manager, admin, auditor, and owner roles.
+- Membership-aware access controls for team/project shared memory.
+- Admin policy publishing with versioned policies.
+- Device policy sync that renders local `privacy.json` and storage policy shapes.
+- Team memory sync from local MemoryOS captures into redacted shared memory.
+- Scoped Hermes Agent grants and `/agent/context` access that cannot read outside the grant's team/project scope.
+- JSONL and CSV audit exports.
+
+Required production configuration:
+
+- `MEMORYOS_ENTERPRISE_ENABLED=true`
+- Enterprise DB path or managed database connection strategy through `MEMORYOS_ENTERPRISE_DB`
+- OIDC issuer, audience, and JWKS URL, or a deployment-managed HS256 JWT secret
+- Bootstrap token for first organization setup
+- Local MemoryOS DB path for sync workers through `MEMORYOS_LOCAL_DB`
+- TLS, reverse proxy, secret storage, backup policy, monitoring, and deployment hardening supplied by the enterprise environment
 
 ## Product Positioning
 
-MemoryOS for Teams gives every worker and every approved workplace agent durable company context. It helps teams stop losing knowledge across meetings, docs, chats, tickets, code reviews, handoffs, and daily work.
+MemoryOS Teams gives every worker and every approved workplace agent durable company context. It helps teams stop losing knowledge across meetings, docs, chats, tickets, code reviews, handoffs, and daily work.
 
 The enterprise product should be positioned as:
 
@@ -31,13 +55,13 @@ It should not be positioned as raw activity monitoring. The winning enterprise v
 
 ## Pipeline Checklist
 
-The full Teams pipeline should work in this order when the product track is built:
+The enterprise pipeline works in this order:
 
 1. **Personal MemoryOS stays local**: each employee keeps a private local memory on their work machine.
 2. **Enterprise policy service**: admins define approved capture sources, exclusions, retention, redaction, sharing, and sync rules.
 3. **Identity and access**: organization, employee, team, project, role, and device state control access.
 4. **Team memory sync**: selected or policy-approved captures are promoted from private memory into shared project memory.
-5. **Hermes Agent connector**: approved agents request bounded context by employee, team, or project.
+5. **Hermes Agent connector**: approved agents request bounded context by team or project through scoped grants.
 6. **Admin dashboard**: companies manage policies, teams, shared memories, audit logs, retention, and access reviews.
 7. **Enterprise security**: encryption, redaction, SSO, device trust, export/delete controls, and audit trails make the system acceptable for real organizations.
 
@@ -192,26 +216,33 @@ Enterprise admins and compliance teams need controls that make the system accept
 
 Executives should see summarized business memory. Compliance should see policy and audit evidence. Employees should see and control their own private memory.
 
-## MVP Scope
+## Implemented Foundation
 
-The first Teams MVP should be small enough to ship but strong enough to prove the enterprise model.
+The first enterprise foundation is intentionally backend-first. It gives enterprises a deployable control plane and API surface while preserving the separate personal MemoryOS app.
 
-Recommended MVP:
+Included:
 
-- Add organization, user, team, project, and memory-share concepts.
-- Add an explicit private vs shared memory state.
-- Add a local-to-team sync path for approved captures.
-- Add admin-managed privacy policy that can be pulled onto the local machine.
-- Add a team memory page in the web UI.
-- Add a Hermes Agent context endpoint for "current employee context" and "current project context".
-- Add audit rows for shared, opened, exported, and deleted memory.
-- Add a product-level onboarding flow that explains what stays private and what can be shared.
+- Organization, user, team, project, membership, and device concepts.
+- Private local memory stays in the personal MemoryOS DB.
+- Shared team memory is stored separately as redacted `shared_memories`.
+- Admin-managed policy publishing and device policy sync.
+- Hermes Agent context endpoint for scoped team/project context.
+- Audit rows for bootstrap, policy publish, device registration, team/project creation, memory share, agent grant, agent context read, and audit export.
+
+Still recommended next:
+
+- Dedicated enterprise admin web console.
+- SAML/OIDC provider mapping templates for Okta, Microsoft Entra, and Google Workspace.
+- SCIM provisioning.
+- Managed KMS and envelope encryption.
+- Postgres adapter for hosted multi-org deployments.
+- Production deployment templates.
 
 ## Data Model Direction
 
-The enterprise layer should extend the local model rather than replace it.
+The enterprise layer extends the local model instead of replacing it.
 
-Likely entities:
+Implemented entities:
 
 - `organizations`
 - `users`
@@ -220,9 +251,9 @@ Likely entities:
 - `projects`
 - `team_memberships`
 - `project_memberships`
-- `enterprise_policies`
-- `memory_shares`
+- `policies`
 - `shared_memories`
+- `memory_sync_events`
 - `agent_access_grants`
 - `audit_events`
 
@@ -230,18 +261,33 @@ The local SQLite store can remain the personal source of truth. Shared project m
 
 ## Agent API Direction
 
-Hermes Agent should be able to ask MemoryOS for bounded context.
+Hermes Agent can ask MemoryOS Teams for bounded context through scoped grants.
 
 Useful endpoints:
 
-- `GET /agent/context/recent`
-- `POST /agent/context/search`
-- `GET /agent/context/project/{project_id}`
-- `GET /agent/context/team/{team_id}`
-- `POST /agent/context/brief`
-- `POST /agent/actions/share-request`
+- `POST /agent/context`
+- `POST /admin/agent-grants`
 
-Agent access should always be policy-bound, auditable, and scoped to the employee, team, project, or organization role that granted it.
+Agent access is policy-bound, auditable, and scoped to the team/project grant created by an admin.
+
+## Enterprise Backend Endpoints
+
+- `POST /bootstrap`
+- `GET /auth/me`
+- `GET /admin/overview`
+- `GET /admin/policy`
+- `PUT /admin/policy`
+- `POST /admin/teams`
+- `POST /admin/teams/{team_id}/members`
+- `POST /admin/projects`
+- `POST /sync/devices`
+- `GET /sync/policy`
+- `POST /sync/share`
+- `GET /sync/shared`
+- `POST /admin/agent-grants`
+- `POST /agent/context`
+- `GET /audit/events`
+- `GET /audit/export`
 
 ## Privacy and Trust Requirements
 
