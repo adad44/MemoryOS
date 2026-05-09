@@ -25,6 +25,8 @@ The short version: run MemoryOS locally, collect a small amount of context, buil
 
 MemoryOS is being designed to expand from personal work memory into a team and enterprise memory layer. The goal is to give every employee a private work memory while giving teams a controlled way to share approved project context with coworkers and AI agents.
 
+Teams is a separate roadmap product track, not part of the current local MemoryOS install.
+
 The full product sequence and enterprise plan live in [docs/MEMORYOS_TEAMS.md](docs/MEMORYOS_TEAMS.md).
 
 In a team setup, MemoryOS would help companies:

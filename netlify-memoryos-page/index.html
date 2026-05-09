@@ -97,6 +97,14 @@
         text-decoration: none;
       }
 
+      .nav-links a:focus-visible,
+      .primary-link:focus-visible,
+      .secondary-link:focus-visible,
+      .footer-links a:focus-visible {
+        outline: 3px solid rgb(83 109 254 / 0.35);
+        outline-offset: 3px;
+      }
+
       .hero-content {
         display: grid;
         grid-template-columns: minmax(0, 1fr) minmax(320px, 500px);
@@ -315,7 +323,8 @@
         line-height: 1.55;
       }
 
-      .teams-note {
+      .teams-note,
+      .teams-panel {
         margin-top: 22px;
         border-left: 4px solid var(--teal);
         background: #f7fbfa;
@@ -326,10 +335,29 @@
         padding: 16px 18px;
       }
 
+      .teams-panel {
+        border: 1px solid var(--line);
+        border-left: 4px solid var(--blue);
+        background: #ffffff;
+        font-weight: 400;
+      }
+
+      .teams-panel h3 {
+        margin-bottom: 8px;
+      }
+
+      .teams-panel p {
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.6;
+      }
+
       .teams-flow {
         display: grid;
         gap: 14px;
         margin-top: 22px;
+        padding: 0;
+        list-style: none;
       }
 
       .teams-step {
@@ -359,6 +387,23 @@
         color: var(--muted);
         font-size: 15px;
         line-height: 1.55;
+      }
+
+      .teams-examples {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 14px;
+      }
+
+      .teams-example {
+        border: 1px solid var(--line);
+        background: #f7fafb;
+        color: #34444f;
+        font-size: 14px;
+        font-weight: 800;
+        line-height: 1.45;
+        padding: 12px;
       }
 
       .command-wrap {
@@ -590,7 +635,8 @@
 
         .section-grid,
         .feature-grid,
-        .teams-step {
+        .teams-step,
+        .teams-examples {
           grid-template-columns: 1fr;
         }
 
@@ -743,7 +789,7 @@
 
       <section class="section section-grid" id="teams" aria-labelledby="teams-heading">
         <div>
-          <div class="kicker">Coming soon to teams</div>
+          <div class="kicker">Coming soon: MemoryOS for Teams</div>
           <h2 id="teams-heading">A shared memory layer for employees, projects, and workplace agents.</h2>
         </div>
         <div>
@@ -751,43 +797,78 @@
             MemoryOS for Teams is the planned enterprise version: every employee keeps a private work memory, while approved project context can become shared team memory for coworkers and agents like Hermes Agent.
           </p>
           <div class="teams-note">
-            The product rule is simple: employees own private work memory, companies own shared project memory, and policies decide what crosses the boundary.
+            Separate product track: Teams is not part of the current local MemoryOS install. It is the enterprise pipeline MemoryOS can grow into.
           </div>
-          <div class="teams-flow" aria-label="MemoryOS Teams sequence">
-            <div class="teams-step">
+          <div class="teams-note">
+            Product rule: employees own private work memory, companies own shared project memory, and policies decide what crosses the boundary.
+          </div>
+          <div class="teams-panel" id="teams-privacy">
+            <h3>Trust boundary</h3>
+            <p>Private captures stay local and employee-visible by default. Shared memory is promoted only through policy-approved sources, explicit share states, redaction rules, and audit logs, so teams get continuity without raw activity monitoring.</p>
+          </div>
+          <ol class="teams-flow" aria-label="MemoryOS Teams sequence">
+            <li class="teams-step">
               <span class="teams-label">Setup</span>
               <div>
                 <h3>Company policy</h3>
                 <p>Admins define capture sources, app and domain exclusions, retention, SSO, project workspaces, access rules, and audit requirements.</p>
               </div>
-            </div>
-            <div class="teams-step">
+            </li>
+            <li class="teams-step">
               <span class="teams-label">Workday</span>
               <div>
                 <h3>Private employee memory</h3>
                 <p>Each worker's machine remembers approved meetings, docs, tickets, browser research, code reviews, decisions, blockers, and follow-ups.</p>
               </div>
-            </div>
-            <div class="teams-step">
+            </li>
+            <li class="teams-step">
+              <span class="teams-label">Identity</span>
+              <div>
+                <h3>Access follows the org chart</h3>
+                <p>Employees, teams, projects, devices, and roles determine which memories can be searched, shared, exported, or used by agents.</p>
+              </div>
+            </li>
+            <li class="teams-step">
               <span class="teams-label">Agents</span>
               <div>
                 <h3>Hermes Agent stays caught up</h3>
-                <p>Approved agents can ask MemoryOS for recent employee context or project context instead of starting from a blank prompt.</p>
+                <p>Approved agents request bounded context by employee, team, or project. Every read should be policy-scoped and auditable, with share requests handled through explicit user or admin-approved flows.</p>
               </div>
-            </div>
-            <div class="teams-step">
+            </li>
+            <li class="teams-step">
               <span class="teams-label">Sharing</span>
               <div>
                 <h3>Team memory forms from approved context</h3>
                 <p>Product decisions, customer requirements, launch risks, ownership, and handoff notes become searchable shared memory for the right teammates.</p>
               </div>
-            </div>
-            <div class="teams-step">
+            </li>
+            <li class="teams-step">
+              <span class="teams-label">Govern</span>
+              <div>
+                <h3>Admins manage the boundary</h3>
+                <p>Policy controls handle retention, redaction, audit logs, sensitive data rules, source allowlists, and access reviews.</p>
+              </div>
+            </li>
+            <li class="teams-step">
               <span class="teams-label">Continuity</span>
               <div>
                 <h3>Teams stop losing context</h3>
                 <p>New hires ramp faster, managers see blockers, peers can catch up asynchronously, and approved knowledge survives vacations, team changes, and departures.</p>
               </div>
+            </li>
+          </ol>
+          <div class="teams-panel" id="teams-mvp">
+            <h3>First Teams MVP</h3>
+            <p>The first Teams product should add organization workspaces, team and project membership, private versus shared memory states, a team memory page, admin policy sync, Hermes Agent context access, and audit rows for shared, opened, exported, and deleted memory.</p>
+          </div>
+          <div class="teams-panel" id="teams-agent-api">
+            <h3>Shared-memory architecture</h3>
+            <p>The enterprise layer extends the local model instead of replacing it: personal memory remains local-first, while approved shared memory can sync to a company-controlled organization layer.</p>
+            <div class="teams-examples" aria-label="Example team memory questions">
+              <div class="teams-example">What changed on the Acme account this week?</div>
+              <div class="teams-example">Who owns the launch blockers?</div>
+              <div class="teams-example">Prep me for my client meeting.</div>
+              <div class="teams-example">What decisions did this project lose during handoff?</div>
             </div>
           </div>
         </div>
@@ -905,6 +986,7 @@
         </div>
         <div class="footer-links" aria-label="Footer links">
           <a href='/demo'>Demo</a>
+          <a href="#teams">Teams</a>
           <a href="https://github.com/adad44/MemoryOS">GitHub</a>
           <a href="https://github.com/adad44/MemoryOS/blob/main/LICENSE">MIT License</a>
           <span>Local-first</span>

@@ -10,6 +10,12 @@ Companies own shared project memory.
 Policies decide what crosses the boundary.
 ```
 
+## Current Status
+
+MemoryOS for Teams is a roadmap product and should stay separate from the current local MemoryOS install until the enterprise surface is ready. The current app proves the personal memory layer: local capture, local search, local controls, and agent-readable context. The Teams product adds organization identity, shared project memory, admin policy, and audited agent access on top of that foundation.
+
+The public Netlify page should describe what Teams can become without implying that SSO, RBAC, cross-device sync, or company-wide agent access already ship in the local installer.
+
 ## Product Positioning
 
 MemoryOS for Teams gives every worker and every approved workplace agent durable company context. It helps teams stop losing knowledge across meetings, docs, chats, tickets, code reviews, handoffs, and daily work.
@@ -22,6 +28,20 @@ The enterprise product should be positioned as:
 - A controlled system for onboarding, handoffs, project recall, and institutional knowledge.
 
 It should not be positioned as raw activity monitoring. The winning enterprise version is private-first, employee-visible, admin-governed, and built around explicit sharing boundaries.
+
+## Pipeline Checklist
+
+The full Teams pipeline should work in this order when the product track is built:
+
+1. **Personal MemoryOS stays local**: each employee keeps a private local memory on their work machine.
+2. **Enterprise policy service**: admins define approved capture sources, exclusions, retention, redaction, sharing, and sync rules.
+3. **Identity and access**: organization, employee, team, project, role, and device state control access.
+4. **Team memory sync**: selected or policy-approved captures are promoted from private memory into shared project memory.
+5. **Hermes Agent connector**: approved agents request bounded context by employee, team, or project.
+6. **Admin dashboard**: companies manage policies, teams, shared memories, audit logs, retention, and access reviews.
+7. **Enterprise security**: encryption, redaction, SSO, device trust, export/delete controls, and audit trails make the system acceptable for real organizations.
+
+Every step must preserve the product rule: employees own private work memory, companies own shared project memory, and policies decide what crosses the boundary.
 
 ## Enterprise Sequence
 
