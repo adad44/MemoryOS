@@ -149,8 +149,39 @@ async function exportAudit() {
 @app.get("/health")
 def health() -> dict[str, Any]:
     settings = load_settings()
+    checks: dict[str, Any] = {
+        "database": {"ok": False, "engine": settings.database_engine},
+        "kms": {"ok": not settings.encryption_enabled, "provider": settings.kms_provider},
+    }
+    try:
+        with connect() as conn:
+            conn.execute("SELECT 1").fetchone()
+        checks["database"]["ok"] = True
+    except Exception as exc:
+        checks["database"]["error"] = str(exc)
+    if settings.encryption_enabled:
+        if settings.kms_provider == "local":
+            checks["kms"]["ok"] = bool(settings.kms_master_key)
+            if not checks["kms"]["ok"]:
+                checks["kms"]["error"] = "MEMORYOS_ENTERPRISE_LOCAL_KMS_MASTER_KEY is required."
+        elif settings.kms_provider == "aws":
+            try:
+                import boto3  # noqa: F401
+
+                checks["kms"]["ok"] = bool(settings.kms_key_id)
+                if not checks["kms"]["ok"]:
+                    checks["kms"]["error"] = "MEMORYOS_ENTERPRISE_KMS_KEY_ID is required."
+            except Exception:
+                checks["kms"]["ok"] = False
+                checks["kms"]["error"] = "boto3 is required for AWS KMS."
+        else:
+            checks["kms"]["ok"] = False
+            checks["kms"]["error"] = f"Unsupported KMS provider: {settings.kms_provider}"
+    ok = bool(checks["database"]["ok"] and checks["kms"]["ok"])
+    if not ok:
+        raise HTTPException(status_code=503, detail={"ok": False, "checks": checks})
     return {
-        "ok": True,
+        "ok": ok,
         "enterprise_enabled": settings.enabled,
         "sso_configured": bool((settings.oidc_jwks_url or settings.jwt_hs256_secret) and settings.oidc_audience),
         "database_engine": settings.database_engine,
@@ -158,6 +189,7 @@ def health() -> dict[str, Any]:
         "encryption_enabled": settings.encryption_enabled,
         "kms_provider": settings.kms_provider,
         "scim_configured": bool(settings.scim_token),
+        "checks": checks,
     }
 
 

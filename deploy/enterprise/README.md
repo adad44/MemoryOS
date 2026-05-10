@@ -11,9 +11,9 @@ docker compose up --build
 
 The compose template runs the enterprise API on `http://127.0.0.1:8775` with a persistent SQLite volume. It is suitable for a self-hosted pilot.
 
-## Render Blueprint
+## Render Pilot Blueprint
 
-`render.yaml` defines the enterprise API container and required secrets. Set the `sync: false` values in Render before the first production deploy.
+`render.yaml` defines the enterprise API container, a persistent `/data` disk for SQLite pilot storage, and required secrets. Set the `sync: false` values in Render before the first pilot deploy. For broad hosted SaaS, use the managed Postgres contract below after the runtime adapter is enabled and smoke-tested.
 
 ## Managed Database Contract
 
@@ -31,7 +31,7 @@ MEMORYOS_ENTERPRISE_DATABASE_ENGINE=postgres
 MEMORYOS_ENTERPRISE_DATABASE_URL=postgresql://user:password@host:5432/memoryos
 ```
 
-The current PR includes deploy templates and the database configuration contract. The runtime Postgres adapter remains guarded until the query adapter layer is completed and smoke-tested against a real Postgres URL.
+The current PR includes deploy templates, a durable SQLite pilot path, and the managed database configuration contract. The runtime Postgres adapter remains guarded until the query adapter layer is completed and smoke-tested against a real Postgres URL.
 
 ## Required Secrets
 

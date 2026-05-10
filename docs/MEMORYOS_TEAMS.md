@@ -38,10 +38,10 @@ Implemented now:
 Required production configuration:
 
 - `MEMORYOS_ENTERPRISE_ENABLED=true`
-- Enterprise DB path or managed database connection strategy through `MEMORYOS_ENTERPRISE_DB`
+- SQLite DB path through `MEMORYOS_ENTERPRISE_DB`, or managed database contract through `MEMORYOS_ENTERPRISE_DATABASE_ENGINE` and `MEMORYOS_ENTERPRISE_DATABASE_URL`
 - OIDC issuer, audience, and JWKS URL, or a deployment-managed HS256 JWT secret
 - SCIM token for identity-provider provisioning
-- KMS provider/key configuration and search index HMAC key when encryption is enabled
+- KMS provider/key configuration and search index HMAC key when encryption is enabled; local KMS is smoke-tested, AWS KMS has provider hooks and still needs cloud credential smoke before production use
 - Bootstrap token for first organization setup
 - TLS, reverse proxy, secret storage, backup policy, monitoring, and deployment hardening supplied by the enterprise environment
 
@@ -240,7 +240,7 @@ Included:
 Still recommended next:
 
 - SAML/OIDC provider mapping templates for Okta, Microsoft Entra, and Google Workspace.
-- Cloud-managed KMS providers beyond the local envelope-encryption provider.
+- Cloud KMS deployment smoke tests and provider templates beyond the current local/AWS provider hooks.
 - Runtime Postgres adapter for hosted multi-org deployments.
 
 ## Data Model Direction

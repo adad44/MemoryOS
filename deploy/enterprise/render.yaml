@@ -5,6 +5,10 @@ services:
     dockerfilePath: deploy/enterprise/Dockerfile
     plan: standard
     healthCheckPath: /health
+    disks:
+      - name: memoryos-enterprise-data
+        mountPath: /data
+        sizeGB: 10
     envVars:
       - key: MEMORYOS_ENTERPRISE_ENABLED
         value: "true"
