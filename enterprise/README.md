@@ -5,12 +5,15 @@ This folder contains the separate enterprise backend for MemoryOS Teams. It is i
 ## What It Provides
 
 - OIDC/JWKS or deployment-managed HS256 JWT validation.
+- SCIM 2.0 user and group provisioning endpoints.
 - Organization, user, device, team, project, membership, policy, shared memory, agent grant, and audit tables.
 - RBAC for member, manager, admin, auditor, and owner roles.
+- Browser admin console at `/admin/console`.
 - Admin policy publishing and device policy sync.
-- Team memory sync from an employee's local MemoryOS database into redacted shared memory.
+- Team memory sync from employee-side approved capture payloads into redacted shared memory.
 - Scoped Hermes Agent enterprise grants through `/agent/context`.
 - Audit events and JSONL/CSV exports.
+- Optional envelope encryption for shared-memory payloads plus blind search terms for encrypted retrieval.
 
 ## Production Configuration
 
@@ -23,9 +26,16 @@ export MEMORYOS_ENTERPRISE_BOOTSTRAP_TOKEN="replace-with-bootstrap-secret"
 export MEMORYOS_ENTERPRISE_OIDC_ISSUER="https://issuer.example.com"
 export MEMORYOS_ENTERPRISE_OIDC_AUDIENCE="memoryos-enterprise"
 export MEMORYOS_ENTERPRISE_OIDC_JWKS_URL="https://issuer.example.com/.well-known/jwks.json"
+export MEMORYOS_ENTERPRISE_SCIM_TOKEN="replace-with-scim-secret"
+export MEMORYOS_ENTERPRISE_SCIM_ORG="acme"
+export MEMORYOS_ENTERPRISE_ENCRYPTION_ENABLED=true
+export MEMORYOS_ENTERPRISE_KMS_PROVIDER=local
+export MEMORYOS_ENTERPRISE_LOCAL_KMS_MASTER_KEY="replace-with-32-byte-base64-or-secret-manager-value"
+export MEMORYOS_ENTERPRISE_KMS_KEY_ID="memoryos-enterprise-production"
+export MEMORYOS_ENTERPRISE_SEARCH_INDEX_KEY="replace-with-random-search-hmac-key"
 ```
 
-For controlled local pilots, `MEMORYOS_ENTERPRISE_JWT_HS256_SECRET` can be used instead of `MEMORYOS_ENTERPRISE_OIDC_JWKS_URL`. Production deployments should prefer the enterprise IdP's JWKS endpoint and store secrets in the deployment platform or company secret manager.
+For controlled local pilots, `MEMORYOS_ENTERPRISE_JWT_HS256_SECRET` can be used instead of `MEMORYOS_ENTERPRISE_OIDC_JWKS_URL`. Production deployments should prefer the enterprise IdP's JWKS endpoint and store secrets in the deployment platform or company secret manager. For managed KMS, set `MEMORYOS_ENTERPRISE_KMS_PROVIDER=aws`, `MEMORYOS_ENTERPRISE_KMS_KEY_ID` to the AWS KMS key ARN, and optionally `MEMORYOS_ENTERPRISE_KMS_REGION`.
 
 The service should run behind enterprise TLS, reverse proxy controls, backup policy, log retention, monitoring, and a managed secret store. The current backend stores data in SQLite; hosted multi-org deployments should add a Postgres adapter before broad SaaS rollout.
 
@@ -41,6 +51,12 @@ Default URL:
 http://127.0.0.1:8775
 ```
 
+Admin console:
+
+```text
+http://127.0.0.1:8775/admin/console
+```
+
 ## Smoke Test
 
 Run the end-to-end enterprise pipeline against disposable databases:
@@ -49,7 +65,7 @@ Run the end-to-end enterprise pipeline against disposable databases:
 .venv/bin/python scripts/smoke_enterprise_backend.py
 ```
 
-The smoke test verifies health, blocked pre-bootstrap SSO access, bootstrap, SSO/JWT role mapping from provisioned users, RBAC denial for auditor policy writes, device ownership checks, policy sync, team/project memory sharing, redaction, non-member team-read denial, member team-read approval, scoped Hermes Agent access, scoped-grant denial, private-memory denial, and audit export.
+The smoke test verifies health, admin console rendering, SCIM service metadata, SCIM user provisioning, blocked pre-bootstrap SSO access, bootstrap, SSO/JWT role mapping from provisioned users, RBAC denial for auditor policy writes, device ownership checks, policy sync, team/project memory sharing, redaction, envelope encryption at rest, encrypted search through Hermes Agent, non-member team-read denial, member team-read approval, scoped Hermes Agent access, scoped-grant denial, private-memory denial, and audit export.
 
 ## Bootstrap
 

@@ -5,6 +5,7 @@ import json
 import os
 import secrets
 import socket
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -31,7 +32,8 @@ def request(method: str, url: str, data: dict[str, Any] | None = None, token: st
             payload = response.read().decode("utf-8")
             if response.status != expect:
                 raise AssertionError(f"{method} {url} expected {expect}, got {response.status}: {payload}")
-            return json.loads(payload) if payload else {}
+            content_type = response.headers.get("content-type", "")
+            return json.loads(payload) if payload and "json" in content_type else payload
     except urllib.error.HTTPError as exc:
         payload = exc.read().decode("utf-8")
         if exc.code == expect:
@@ -69,6 +71,8 @@ def main() -> int:
         bootstrap_token = secrets.token_urlsafe(32)
         jwt_secret = secrets.token_urlsafe(48)
         agent_token = secrets.token_urlsafe(32)
+        scim_token = secrets.token_urlsafe(32)
+        kms_key = secrets.token_urlsafe(48)
 
         env = os.environ.copy()
         env.update(
@@ -81,6 +85,11 @@ def main() -> int:
                 "MEMORYOS_ENTERPRISE_OIDC_AUDIENCE": "memoryos-enterprise",
                 "MEMORYOS_ENTERPRISE_DEFAULT_ORG": "acme",
                 "MEMORYOS_ENTERPRISE_PORT": str(port),
+                "MEMORYOS_ENTERPRISE_SCIM_TOKEN": scim_token,
+                "MEMORYOS_ENTERPRISE_SCIM_ORG": "acme",
+                "MEMORYOS_ENTERPRISE_ENCRYPTION_ENABLED": "true",
+                "MEMORYOS_ENTERPRISE_KMS_MASTER_KEY": kms_key,
+                "MEMORYOS_ENTERPRISE_KMS_KEY_ID": "smoke-key",
             }
         )
         proc = subprocess.Popen(
@@ -120,6 +129,12 @@ def main() -> int:
                 bootstrap_token,
             )
             request("GET", f"{base}/auth/me", token=owner)
+            console = request("GET", f"{base}/admin/console")
+            if "MemoryOS Teams Admin" not in console:
+                raise AssertionError("Admin console did not render.")
+            scim_config = request("GET", f"{base}/scim/v2/ServiceProviderConfig")
+            if not scim_config["patch"]["supported"]:
+                raise AssertionError("SCIM service provider config is not valid.")
             member_principal = request(
                 "POST",
                 f"{base}/admin/users",
@@ -142,6 +157,24 @@ def main() -> int:
                 },
                 owner,
             )
+            scim_user = request(
+                "POST",
+                f"{base}/scim/v2/Users",
+                {
+                    "userName": "scim@acme.example",
+                    "externalId": "scim-subject",
+                    "displayName": "SCIM User",
+                    "active": True,
+                    "emails": [{"value": "scim@acme.example", "primary": True}],
+                },
+                scim_token,
+                expect=201,
+            )
+            if scim_user["userName"] != "scim@acme.example":
+                raise AssertionError("SCIM user create failed.")
+            scim_member = token(jwt_secret, "owner", "scim-subject", "scim@acme.example")
+            if request("GET", f"{base}/auth/me", token=scim_member)["role"] != "member":
+                raise AssertionError("SCIM-provisioned user did not authenticate with stored role.")
             member_me = request("GET", f"{base}/auth/me", token=forged_member)
             if member_me["role"] != "member":
                 raise AssertionError("JWT role claim overrode provisioned member role.")
@@ -197,6 +230,11 @@ def main() -> int:
             shared_text = json.dumps(shared).lower()
             if "secret" in shared_text:
                 raise AssertionError("Shared memory was not redacted.")
+            with sqlite3.connect(enterprise_db) as db:
+                db.row_factory = sqlite3.Row
+                encrypted_row = db.execute("SELECT redacted_content, redacted_content_ciphertext, encrypted_dek, kms_key_id FROM shared_memories WHERE id = ?", (shared["id"],)).fetchone()
+                if encrypted_row["redacted_content"] != "[encrypted]" or not encrypted_row["redacted_content_ciphertext"] or encrypted_row["kms_key_id"] != "smoke-key":
+                    raise AssertionError("Shared memory content was not envelope encrypted at rest.")
             request("GET", f"{base}/sync/shared?team_id={team['id']}", token=member, expect=403)
             request(
                 "POST",

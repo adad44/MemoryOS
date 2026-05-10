@@ -794,7 +794,7 @@
         </div>
         <div>
           <p class="body-copy">
-            MemoryOS Teams now has a separate enterprise backend foundation for companies that want SSO, admin policy sync, team memory sync, RBAC, audit exports, and Hermes Agent enterprise access while keeping each employee's private MemoryOS local.
+            MemoryOS Teams now has a separate enterprise backend foundation for companies that want SSO, SCIM provisioning, admin policy sync, team memory sync, RBAC, audit exports, encryption, and Hermes Agent enterprise access while keeping each employee's private MemoryOS local.
           </p>
           <div class="teams-note">
             Separate product track: Teams is not mixed into the personal localhost MemoryOS app. Enterprises run the organization layer separately and connect it to their IdP, deployment controls, and employee-side sync workers.
@@ -811,7 +811,7 @@
               <span class="teams-label">Setup</span>
               <div>
                 <h3>SSO and company policy</h3>
-                <p>Admins connect OIDC/JWT auth, bootstrap the organization, provision users, define capture sources, exclusions, retention, team workspaces, role rules, and audit requirements.</p>
+                <p>Admins connect OIDC/JWT auth, bootstrap the organization, provision users through SCIM or the admin console, define capture sources, exclusions, retention, team workspaces, role rules, and audit requirements.</p>
               </div>
             </li>
             <li class="teams-step">
@@ -846,7 +846,7 @@
               <span class="teams-label">Govern</span>
               <div>
                 <h3>Admins manage the boundary</h3>
-                <p>Policy controls handle retention, redaction, source allowlists, sensitive data rules, role-based access, device policy sync, and JSONL/CSV audit exports.</p>
+                <p>Policy controls handle retention, redaction, source allowlists, sensitive data rules, role-based access, device policy sync, encrypted shared-memory storage, and JSONL/CSV audit exports.</p>
               </div>
             </li>
             <li class="teams-step">

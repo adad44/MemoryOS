@@ -8,8 +8,10 @@ from typing import Any, Optional
 from fastapi import HTTPException
 
 from .audit import log_event, now, row_dict
+from .crypto import decrypt_text, encrypt_text
 from .policies import active_policy, json_text, redact, redact_value, render_local_privacy_settings, render_local_storage_policy
 from .rbac import ensure_project_in_org, require_device_access, require_project_access, require_team_access
+from .search import term_hashes_for_text
 from .schemas import Principal, ShareMemoryRequest, SharedMemory
 
 
@@ -19,6 +21,15 @@ def shared_memory_from_row(row: sqlite3.Row) -> SharedMemory:
         metadata = json.loads(data.get("metadata") or "{}")
     except Exception:
         metadata = {}
+    redacted_content = decrypt_text(
+        str(data["redacted_content"]),
+        ciphertext=data.get("redacted_content_ciphertext"),
+        content_nonce=data.get("redacted_content_nonce"),
+        encrypted_dek=data.get("encrypted_dek"),
+        dek_nonce=data.get("dek_nonce"),
+        kms_key_id=data.get("kms_key_id"),
+        aad=f"shared_memory:{data['id']}",
+    )
     return SharedMemory(
         id=int(data["id"]),
         local_capture_id=data["local_capture_id"],
@@ -29,7 +40,7 @@ def shared_memory_from_row(row: sqlite3.Row) -> SharedMemory:
         share_state=str(data["share_state"]),
         title=data["title"],
         summary=str(data["summary"]),
-        redacted_content=str(data["redacted_content"]),
+        redacted_content=redacted_content,
         metadata=metadata,
         created_at=str(data["created_at"]),
     )
@@ -75,12 +86,15 @@ def share_local_capture(conn: sqlite3.Connection, principal: Principal, request:
         policy,
     )
     source_hash = hashlib.sha256(f"{request.local_capture_id}:{content}".encode("utf-8")).hexdigest()
+    encrypted = encrypt_text(redacted_content, aad=f"shared_memory:pending:{source_hash}")
+    stored_content = "[encrypted]" if encrypted else redacted_content
     cursor = conn.execute(
         """
         INSERT INTO shared_memories
         (organization_id, local_capture_id, team_id, project_id, shared_by_user_id, policy_version,
-         source_hash, title, summary, redacted_content, metadata)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         source_hash, title, summary, redacted_content, redacted_content_ciphertext, redacted_content_nonce,
+         encrypted_dek, dek_nonce, kms_key_id, metadata)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             principal.organization_id,
@@ -92,17 +106,44 @@ def share_local_capture(conn: sqlite3.Connection, principal: Principal, request:
             source_hash,
             title,
             summary,
-            redacted_content,
+            stored_content,
+            encrypted.get("ciphertext"),
+            encrypted.get("content_nonce"),
+            encrypted.get("encrypted_dek"),
+            encrypted.get("dek_nonce"),
+            encrypted.get("kms_key_id"),
             json_text(metadata),
         ),
     )
     shared_id = int(cursor.lastrowid)
+    if encrypted:
+        encrypted = encrypt_text(redacted_content, aad=f"shared_memory:{shared_id}")
+        conn.execute(
+            """
+            UPDATE shared_memories
+            SET redacted_content_ciphertext = ?, redacted_content_nonce = ?, encrypted_dek = ?, dek_nonce = ?, kms_key_id = ?
+            WHERE id = ?
+            """,
+            (
+                encrypted["ciphertext"],
+                encrypted["content_nonce"],
+                encrypted["encrypted_dek"],
+                encrypted["dek_nonce"],
+                encrypted["kms_key_id"],
+                shared_id,
+            ),
+        )
     conn.execute(
         """
         INSERT INTO memory_sync_events (organization_id, shared_memory_id, device_id, event_type, status, details)
         VALUES (?, ?, ?, 'share', 'complete', ?)
         """,
         (principal.organization_id, shared_id, request.device_id, json_text({"local_capture_id": request.local_capture_id})),
+    )
+    search_text = " ".join([title, summary, redacted_content, json_text(metadata)])
+    conn.executemany(
+        "INSERT OR IGNORE INTO shared_memory_search_terms (shared_memory_id, term_hash) VALUES (?, ?)",
+        [(shared_id, value) for value in term_hashes_for_text(search_text)],
     )
     log_event(
         conn,
@@ -160,9 +201,19 @@ def list_shared(
         where.append("project_id = ?")
         params.append(project_id)
     if query:
-        where.append("(LOWER(summary) LIKE ? OR LOWER(redacted_content) LIKE ?)")
-        needle = f"%{query.lower()}%"
-        params.extend([needle, needle])
+        hashes = term_hashes_for_text(query)
+        if hashes:
+            placeholders = ",".join(["?"] * len(hashes))
+            where.append(
+                f"""
+                id IN (
+                  SELECT shared_memory_id
+                  FROM shared_memory_search_terms
+                  WHERE term_hash IN ({placeholders})
+                )
+                """
+            )
+            params.extend(hashes)
     rows = conn.execute(
         f"SELECT * FROM shared_memories WHERE {' AND '.join(where)} ORDER BY created_at DESC LIMIT ?",
         [*params, limit],

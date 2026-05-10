@@ -6,6 +6,8 @@ import json
 from typing import Any, Literal, Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Response
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 
 from .agent import issue_agent_context
 from .audit import log_event, now, parse_details, row_dict
@@ -14,6 +16,7 @@ from .config import load_settings
 from .db import connect
 from .policies import active_policy, publish_policy
 from .rbac import ensure_project_in_org, ensure_team_in_org, ensure_user_in_org, is_org_admin, require_project_access, require_role, require_team_access
+from .scim import router as scim_router
 from .schemas import (
     AgentContextRequest,
     AgentContextResponse,
@@ -40,6 +43,99 @@ app = FastAPI(
     version="0.1.0",
     description="Separate enterprise API for SSO, RBAC, policy sync, team memory sync, audit export, and Hermes Agent access.",
 )
+settings = load_settings()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=list(settings.cors_origins),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+app.include_router(scim_router)
+
+
+@app.get("/admin/console", response_class=HTMLResponse)
+def admin_console() -> str:
+    return """
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MemoryOS Teams Admin</title>
+  <style>
+    body { margin: 0; background: #f6f8fa; color: #0d141c; font-family: Inter, system-ui, sans-serif; }
+    main { max-width: 1180px; margin: 0 auto; padding: 32px 20px; }
+    header { display: flex; gap: 16px; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+    h1 { margin: 0; font-size: 32px; }
+    input, textarea { width: 100%; border: 1px solid #cbd5df; border-radius: 8px; padding: 10px; font: inherit; }
+    button { border: 0; border-radius: 8px; background: #111827; color: white; padding: 10px 14px; font-weight: 800; cursor: pointer; }
+    section { background: white; border: 1px solid #dce3ea; border-radius: 8px; padding: 18px; margin: 14px 0; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+    .stat { border: 1px solid #e5eaf0; border-radius: 8px; padding: 12px; }
+    .stat b { display: block; font-size: 28px; }
+    pre { overflow: auto; background: #0d141c; color: #d7fbe8; border-radius: 8px; padding: 12px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border-bottom: 1px solid #edf1f5; padding: 8px; text-align: left; }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>MemoryOS Teams Admin</h1>
+      <p>Enterprise control plane for policy, users, teams, devices, agents, audit, SCIM, and encryption status.</p>
+    </div>
+    <button onclick="loadAll()">Refresh</button>
+  </header>
+  <section>
+    <label>Admin bearer token</label>
+    <input id="token" type="password" placeholder="Paste SSO/JWT bearer token" />
+  </section>
+  <div class="grid" id="stats"></div>
+  <section><h2>Policy</h2><textarea id="policy" rows="9"></textarea><p><button onclick="savePolicy()">Publish policy</button></p></section>
+  <section><h2>Users</h2><div id="users"></div></section>
+  <section><h2>Teams</h2><div id="teams"></div></section>
+  <section><h2>Devices</h2><div id="devices"></div></section>
+  <section><h2>Audit Export</h2><button onclick="exportAudit()">Download JSONL</button></section>
+  <section><h2>SCIM</h2><pre id="scim"></pre></section>
+</main>
+<script>
+const tokenInput = document.getElementById('token');
+tokenInput.value = localStorage.memoryosEnterpriseToken || '';
+tokenInput.addEventListener('input', () => localStorage.memoryosEnterpriseToken = tokenInput.value);
+async function api(path, options = {}) {
+  const res = await fetch(path, { ...options, headers: { 'Authorization': 'Bearer ' + tokenInput.value, 'Content-Type': 'application/json', ...(options.headers || {}) } });
+  if (!res.ok) throw new Error(await res.text());
+  return res.headers.get('content-type')?.includes('json') ? res.json() : res.text();
+}
+function table(rows, cols) {
+  return '<table><thead><tr>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr></thead><tbody>' +
+    rows.map(r => '<tr>' + cols.map(c => `<td>${r[c] ?? ''}</td>`).join('') + '</tr>').join('') + '</tbody></table>';
+}
+async function loadAll() {
+  const overview = await api('/admin/overview');
+  document.getElementById('stats').innerHTML = [
+    ['Users', overview.users.length], ['Teams', overview.teams.length], ['Projects', overview.projects.length],
+    ['Devices', overview.devices.length], ['Shared memories', overview.shared_memory_count], ['Audit events', overview.audit_event_count]
+  ].map(([k,v]) => `<div class="stat">${k}<b>${v}</b></div>`).join('');
+  document.getElementById('policy').value = JSON.stringify(overview.policy, null, 2);
+  document.getElementById('users').innerHTML = table(overview.users, ['id','email','name','role','status','last_seen_at']);
+  document.getElementById('teams').innerHTML = table(overview.teams, ['id','name','description','created_at']);
+  document.getElementById('devices').innerHTML = table(overview.devices, ['id','device_name','trust_state','policy_version','last_seen_at']);
+  document.getElementById('scim').textContent = JSON.stringify(await api('/admin/scim/status'), null, 2);
+}
+async function savePolicy() { await api('/admin/policy', { method: 'PUT', body: document.getElementById('policy').value }); await loadAll(); }
+async function exportAudit() {
+  const text = await api('/audit/export?format=jsonl');
+  const blob = new Blob([text], { type: 'application/x-ndjson' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'memoryos-audit.jsonl'; a.click();
+}
+</script>
+</body>
+</html>
+"""
 
 
 @app.get("/health")
@@ -49,7 +145,11 @@ def health() -> dict[str, Any]:
         "ok": True,
         "enterprise_enabled": settings.enabled,
         "sso_configured": bool((settings.oidc_jwks_url or settings.jwt_hs256_secret) and settings.oidc_audience),
-        "database_url": settings.database_url,
+        "database_engine": settings.database_engine,
+        "database_configured": bool(settings.database_url),
+        "encryption_enabled": settings.encryption_enabled,
+        "kms_provider": settings.kms_provider,
+        "scim_configured": bool(settings.scim_token),
     }
 
 
@@ -116,6 +216,30 @@ def overview(principal: Principal = Depends(require_role("manager"))) -> Overvie
             shared_memory_count=shared_count,
             audit_event_count=audit_count,
         )
+
+
+@app.get("/admin/scim/status")
+def scim_status(principal: Principal = Depends(require_role("admin"))) -> dict[str, Any]:
+    settings = load_settings()
+    with connect() as conn:
+        recent = [
+            parse_details(row_dict(row))
+            for row in conn.execute(
+                """
+                SELECT *
+                FROM audit_events
+                WHERE organization_id = ? AND actor_type = 'scim'
+                ORDER BY created_at DESC
+                LIMIT 10
+                """,
+                (principal.organization_id,),
+            )
+        ]
+    return {
+        "configured": bool(settings.scim_token),
+        "org_slug": settings.scim_org_slug,
+        "recent_events": recent,
+    }
 
 
 @app.get("/admin/policy", response_model=EnterprisePolicy)

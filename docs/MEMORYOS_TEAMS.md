@@ -12,7 +12,7 @@ Policies decide what crosses the boundary.
 
 ## Current Status
 
-MemoryOS Teams now has a separate enterprise backend foundation under `enterprise/backend`. It is not mixed into the personal localhost MemoryOS app. Enterprises can self-host this backend and configure SSO/JWT validation, RBAC, admin policy sync, team memory sync, audit exports, and Hermes Agent enterprise access.
+MemoryOS Teams now has a separate enterprise backend under `enterprise/backend`. It is not mixed into the personal localhost MemoryOS app. Enterprises can self-host this backend and configure SSO/JWT validation, SCIM provisioning, RBAC, admin policy sync, team memory sync, audit exports, envelope encryption, and Hermes Agent enterprise access.
 
 Operator setup notes live in [enterprise/README.md](../enterprise/README.md).
 The end-to-end verification script is `scripts/smoke_enterprise_backend.py`.
@@ -21,6 +21,8 @@ Implemented now:
 
 - Separate FastAPI enterprise backend.
 - SSO/OIDC hooks through JWKS-backed JWT validation or HS256 JWT validation for controlled deployments.
+- SCIM 2.0 user and group provisioning endpoints.
+- Browser admin console at `/admin/console`.
 - Bootstrap token for first organization setup.
 - Organization, user, device, team, project, membership, policy, shared-memory, sync-event, agent-grant, and audit-event tables.
 - Provisioned-user RBAC for member, manager, admin, auditor, and owner roles; token role claims do not override stored enterprise roles.
@@ -29,13 +31,17 @@ Implemented now:
 - Device policy sync that renders local `privacy.json` and storage policy shapes.
 - Team memory sync from employee-side approved capture payloads into redacted shared memory.
 - Scoped Hermes Agent grants and `/agent/context` access that cannot read outside the grant's team/project scope or read private local memory.
+- Optional envelope encryption for shared-memory payloads and blind search terms for encrypted retrieval.
 - JSONL and CSV audit exports.
+- Docker Compose and Render deployment templates under `deploy/enterprise`.
 
 Required production configuration:
 
 - `MEMORYOS_ENTERPRISE_ENABLED=true`
 - Enterprise DB path or managed database connection strategy through `MEMORYOS_ENTERPRISE_DB`
 - OIDC issuer, audience, and JWKS URL, or a deployment-managed HS256 JWT secret
+- SCIM token for identity-provider provisioning
+- KMS provider/key configuration and search index HMAC key when encryption is enabled
 - Bootstrap token for first organization setup
 - TLS, reverse proxy, secret storage, backup policy, monitoring, and deployment hardening supplied by the enterprise environment
 
@@ -61,7 +67,7 @@ The enterprise pipeline works in this order:
 3. **Identity and access**: provisioned organization, employee, team, project, role, and device state control access.
 4. **Team memory sync**: the employee-side sync worker posts selected or policy-approved captures into shared project memory.
 5. **Hermes Agent connector**: approved agents request bounded context by team or project through scoped grants.
-6. **Admin control plane**: companies manage policies, teams, shared memories, audit logs, retention, and access reviews through the enterprise API today, with a dedicated web console as the next product surface.
+6. **Admin control plane**: companies manage policies, teams, shared memories, audit logs, retention, and access reviews through the enterprise API and browser admin console.
 7. **Enterprise security**: encryption, redaction, SSO, device trust, export/delete controls, and audit trails make the system acceptable for real organizations.
 
 Every step must preserve the product rule: employees own private work memory, companies own shared project memory, and policies decide what crosses the boundary.
@@ -217,7 +223,7 @@ Executives should see summarized business memory. Compliance should see policy a
 
 ## Implemented Foundation
 
-The first enterprise foundation is intentionally backend-first. It gives enterprises a deployable control plane and API surface while preserving the separate personal MemoryOS app.
+The enterprise foundation gives enterprises a deployable control plane and API surface while preserving the separate personal MemoryOS app.
 
 Included:
 
@@ -225,17 +231,17 @@ Included:
 - Private local memory stays in the personal MemoryOS DB.
 - Shared team memory is stored separately as redacted `shared_memories`.
 - Admin-managed policy publishing and device policy sync.
+- SCIM user and group provisioning.
+- Browser admin console for overview, policy, users, teams, devices, SCIM status, and audit export.
+- Optional envelope encryption and blind search for shared memory.
 - Hermes Agent context endpoint for scoped team/project context.
 - Audit rows for bootstrap, user provisioning, policy publish, device registration, team/project creation, memory share, agent grant, agent context read, and audit export.
 
 Still recommended next:
 
-- Dedicated enterprise admin web console on top of the current admin API.
 - SAML/OIDC provider mapping templates for Okta, Microsoft Entra, and Google Workspace.
-- SCIM provisioning.
-- Managed KMS and envelope encryption.
-- Postgres adapter for hosted multi-org deployments.
-- Production deployment templates.
+- Cloud-managed KMS providers beyond the local envelope-encryption provider.
+- Runtime Postgres adapter for hosted multi-org deployments.
 
 ## Data Model Direction
 
@@ -274,6 +280,8 @@ Agent access is policy-bound, auditable, and scoped to the team/project grant cr
 - `POST /bootstrap`
 - `GET /auth/me`
 - `GET /admin/overview`
+- `GET /admin/console`
+- `GET /admin/scim/status`
 - `GET /admin/policy`
 - `PUT /admin/policy`
 - `POST /admin/users`
@@ -288,6 +296,13 @@ Agent access is policy-bound, auditable, and scoped to the team/project grant cr
 - `POST /agent/context`
 - `GET /audit/events`
 - `GET /audit/export`
+- `GET /scim/v2/ServiceProviderConfig`
+- `GET /scim/v2/Users`
+- `POST /scim/v2/Users`
+- `PATCH /scim/v2/Users/{user_id}`
+- `DELETE /scim/v2/Users/{user_id}`
+- `GET /scim/v2/Groups`
+- `POST /scim/v2/Groups`
 
 ## Privacy and Trust Requirements
 

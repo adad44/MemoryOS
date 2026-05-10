@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   organization_id INTEGER NOT NULL,
   subject TEXT NOT NULL,
+  external_id TEXT,
   email TEXT NOT NULL,
   name TEXT NOT NULL,
   role TEXT NOT NULL DEFAULT 'member',
@@ -49,6 +50,7 @@ CREATE TABLE IF NOT EXISTS devices (
 CREATE TABLE IF NOT EXISTS teams (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   organization_id INTEGER NOT NULL,
+  external_id TEXT,
   name TEXT NOT NULL,
   description TEXT,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -117,6 +119,11 @@ CREATE TABLE IF NOT EXISTS shared_memories (
   title TEXT,
   summary TEXT NOT NULL,
   redacted_content TEXT NOT NULL,
+  redacted_content_ciphertext TEXT,
+  redacted_content_nonce TEXT,
+  encrypted_dek TEXT,
+  dek_nonce TEXT,
+  kms_key_id TEXT,
   metadata TEXT NOT NULL DEFAULT '{}',
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   revoked_at DATETIME,
@@ -139,6 +146,15 @@ CREATE TABLE IF NOT EXISTS memory_sync_events (
   FOREIGN KEY(organization_id) REFERENCES organizations(id),
   FOREIGN KEY(shared_memory_id) REFERENCES shared_memories(id),
   FOREIGN KEY(device_id) REFERENCES devices(id)
+);
+
+CREATE TABLE IF NOT EXISTS shared_memory_search_terms (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  shared_memory_id INTEGER NOT NULL,
+  term_hash TEXT NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(shared_memory_id, term_hash),
+  FOREIGN KEY(shared_memory_id) REFERENCES shared_memories(id)
 );
 
 CREATE TABLE IF NOT EXISTS agent_access_grants (
@@ -182,12 +198,18 @@ CREATE INDEX IF NOT EXISTS idx_teams_org ON teams(organization_id);
 CREATE INDEX IF NOT EXISTS idx_projects_team ON projects(team_id);
 CREATE INDEX IF NOT EXISTS idx_shared_memories_org ON shared_memories(organization_id);
 CREATE INDEX IF NOT EXISTS idx_shared_memories_project ON shared_memories(project_id);
+CREATE INDEX IF NOT EXISTS idx_shared_search_term ON shared_memory_search_terms(term_hash);
 CREATE INDEX IF NOT EXISTS idx_sync_events_org ON memory_sync_events(organization_id);
 CREATE INDEX IF NOT EXISTS idx_audit_org_time ON audit_events(organization_id, created_at DESC);
 """
 
 
 def connect(path: str | None = None) -> sqlite3.Connection:
+    settings = load_settings()
+    if settings.database_engine not in {"sqlite", "postgres"}:
+        raise ValueError(f"Unsupported enterprise database engine: {settings.database_engine}")
+    if settings.database_engine == "postgres":
+        raise NotImplementedError("Postgres runtime adapter is not enabled in this build. Use the deployment templates and DATABASE_URL contract for managed Postgres rollout.")
     db_url = path or load_settings().database_url
     db_path = Path(db_url).expanduser()
     db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -196,4 +218,27 @@ def connect(path: str | None = None) -> sqlite3.Connection:
     conn.execute("PRAGMA busy_timeout = 30000")
     conn.execute("PRAGMA foreign_keys = ON")
     conn.executescript(SCHEMA)
+    _migrate(conn)
     return conn
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    table_columns = {
+        table: {row["name"] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+        for table in ("users", "teams", "shared_memories")
+    }
+    if "external_id" not in table_columns["users"]:
+        conn.execute("ALTER TABLE users ADD COLUMN external_id TEXT")
+    if "external_id" not in table_columns["teams"]:
+        conn.execute("ALTER TABLE teams ADD COLUMN external_id TEXT")
+    shared_additions = {
+        "redacted_content_ciphertext": "TEXT",
+        "redacted_content_nonce": "TEXT",
+        "encrypted_dek": "TEXT",
+        "dek_nonce": "TEXT",
+        "kms_key_id": "TEXT",
+    }
+    for name, kind in shared_additions.items():
+        if name not in table_columns["shared_memories"]:
+            conn.execute(f"ALTER TABLE shared_memories ADD COLUMN {name} {kind}")
+    conn.commit()
