@@ -132,6 +132,8 @@ def main() -> int:
             console = request("GET", f"{base}/admin/console")
             if "MemoryOS Teams Admin" not in console:
                 raise AssertionError("Admin console did not render.")
+            if "localStorage" in console:
+                raise AssertionError("Admin console should not persist bearer tokens in localStorage.")
             scim_config = request("GET", f"{base}/scim/v2/ServiceProviderConfig")
             if not scim_config["patch"]["supported"]:
                 raise AssertionError("SCIM service provider config is not valid.")
@@ -175,6 +177,26 @@ def main() -> int:
             scim_member = token(jwt_secret, "owner", "scim-subject", "scim@acme.example")
             if request("GET", f"{base}/auth/me", token=scim_member)["role"] != "member":
                 raise AssertionError("SCIM-provisioned user did not authenticate with stored role.")
+            scim_group = request(
+                "POST",
+                f"{base}/scim/v2/Groups",
+                {
+                    "displayName": "SCIM Product",
+                    "externalId": "scim-product",
+                    "members": [{"value": str(member_principal["id"])}],
+                },
+                scim_token,
+                expect=201,
+            )
+            patched_group = request(
+                "PATCH",
+                f"{base}/scim/v2/Groups/{scim_group['id']}",
+                {"Operations": [{"op": "Remove", "path": f"members[value eq \"{member_principal['id']}\"]"}]},
+                scim_token,
+            )
+            if patched_group["members"]:
+                raise AssertionError("SCIM filtered member remove did not update group memberships.")
+            request("DELETE", f"{base}/scim/v2/Groups/{scim_group['id']}", token=scim_token, expect=204)
             member_me = request("GET", f"{base}/auth/me", token=forged_member)
             if member_me["role"] != "member":
                 raise AssertionError("JWT role claim overrode provisioned member role.")
@@ -207,6 +229,12 @@ def main() -> int:
             if policy["privacy_settings"]["blocked_apps"] != ["Personal Notes"]:
                 raise AssertionError("Policy sync did not render local privacy settings.")
             request("GET", f"{base}/sync/policy?device_id={device['id']}", token=member, expect=403)
+            member_device = request("POST", f"{base}/sync/devices", {"device_name": "Member Mac", "trust_state": "trusted"}, member)
+            if member_device["trust_state"] != "pending":
+                raise AssertionError("Non-admin device registration should remain pending.")
+            trusted_member_device = request("PUT", f"{base}/admin/devices/{member_device['id']}/trust", {"trust_state": "trusted"}, owner)
+            if trusted_member_device["trust_state"] != "trusted":
+                raise AssertionError("Admin device trust update failed.")
 
             shared = request(
                 "POST",
@@ -232,9 +260,11 @@ def main() -> int:
                 raise AssertionError("Shared memory was not redacted.")
             with sqlite3.connect(enterprise_db) as db:
                 db.row_factory = sqlite3.Row
-                encrypted_row = db.execute("SELECT redacted_content, redacted_content_ciphertext, encrypted_dek, kms_key_id FROM shared_memories WHERE id = ?", (shared["id"],)).fetchone()
-                if encrypted_row["redacted_content"] != "[encrypted]" or not encrypted_row["redacted_content_ciphertext"] or encrypted_row["kms_key_id"] != "smoke-key":
-                    raise AssertionError("Shared memory content was not envelope encrypted at rest.")
+                encrypted_row = db.execute("SELECT title, summary, redacted_content, metadata, redacted_content_ciphertext, encrypted_dek, kms_key_id FROM shared_memories WHERE id = ?", (shared["id"],)).fetchone()
+                if encrypted_row["title"] != "[encrypted]" or encrypted_row["summary"] != "[encrypted]" or encrypted_row["redacted_content"] != "[encrypted]" or encrypted_row["metadata"] != '{"encrypted":true}':
+                    raise AssertionError("Shared memory payload fields were not envelope encrypted at rest.")
+                if not encrypted_row["redacted_content_ciphertext"] or not encrypted_row["encrypted_dek"] or encrypted_row["kms_key_id"] != "smoke-key":
+                    raise AssertionError("Shared memory envelope encryption metadata is incomplete.")
             request("GET", f"{base}/sync/shared?team_id={team['id']}", token=member, expect=403)
             request(
                 "POST",

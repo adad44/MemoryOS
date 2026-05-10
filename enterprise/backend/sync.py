@@ -21,15 +21,27 @@ def shared_memory_from_row(row: sqlite3.Row) -> SharedMemory:
         metadata = json.loads(data.get("metadata") or "{}")
     except Exception:
         metadata = {}
-    redacted_content = decrypt_text(
-        str(data["redacted_content"]),
-        ciphertext=data.get("redacted_content_ciphertext"),
-        content_nonce=data.get("redacted_content_nonce"),
-        encrypted_dek=data.get("encrypted_dek"),
-        dek_nonce=data.get("dek_nonce"),
-        kms_key_id=data.get("kms_key_id"),
-        aad=f"shared_memory:{data['id']}",
-    )
+    title = data["title"]
+    summary = str(data["summary"])
+    redacted_content = str(data["redacted_content"])
+    if data.get("redacted_content_ciphertext"):
+        payload_text = decrypt_text(
+            "{}",
+            ciphertext=data.get("redacted_content_ciphertext"),
+            content_nonce=data.get("redacted_content_nonce"),
+            encrypted_dek=data.get("encrypted_dek"),
+            dek_nonce=data.get("dek_nonce"),
+            kms_key_id=data.get("kms_key_id"),
+            aad=f"shared_memory:{data['id']}",
+        )
+        try:
+            payload = json.loads(payload_text)
+            title = payload.get("title")
+            summary = str(payload.get("summary") or "")
+            redacted_content = str(payload.get("redacted_content") or "")
+            metadata = payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}
+        except Exception:
+            pass
     return SharedMemory(
         id=int(data["id"]),
         local_capture_id=data["local_capture_id"],
@@ -38,8 +50,8 @@ def shared_memory_from_row(row: sqlite3.Row) -> SharedMemory:
         shared_by_user_id=int(data["shared_by_user_id"]),
         policy_version=int(data["policy_version"]),
         share_state=str(data["share_state"]),
-        title=data["title"],
-        summary=str(data["summary"]),
+        title=title,
+        summary=summary,
         redacted_content=redacted_content,
         metadata=metadata,
         created_at=str(data["created_at"]),
@@ -86,8 +98,17 @@ def share_local_capture(conn: sqlite3.Connection, principal: Principal, request:
         policy,
     )
     source_hash = hashlib.sha256(f"{request.local_capture_id}:{content}".encode("utf-8")).hexdigest()
-    encrypted = encrypt_text(redacted_content, aad=f"shared_memory:pending:{source_hash}")
+    encrypted_payload = {
+        "title": title,
+        "summary": summary,
+        "redacted_content": redacted_content,
+        "metadata": metadata,
+    }
+    encrypted = encrypt_text(json_text(encrypted_payload), aad=f"shared_memory:pending:{source_hash}")
+    stored_title = "[encrypted]" if encrypted else title
+    stored_summary = "[encrypted]" if encrypted else summary
     stored_content = "[encrypted]" if encrypted else redacted_content
+    stored_metadata = json_text({"encrypted": True}) if encrypted else json_text(metadata)
     cursor = conn.execute(
         """
         INSERT INTO shared_memories
@@ -104,20 +125,20 @@ def share_local_capture(conn: sqlite3.Connection, principal: Principal, request:
             principal.user_id,
             policy.version,
             source_hash,
-            title,
-            summary,
+            stored_title,
+            stored_summary,
             stored_content,
             encrypted.get("ciphertext"),
             encrypted.get("content_nonce"),
             encrypted.get("encrypted_dek"),
             encrypted.get("dek_nonce"),
             encrypted.get("kms_key_id"),
-            json_text(metadata),
+            stored_metadata,
         ),
     )
     shared_id = int(cursor.lastrowid)
     if encrypted:
-        encrypted = encrypt_text(redacted_content, aad=f"shared_memory:{shared_id}")
+        encrypted = encrypt_text(json_text(encrypted_payload), aad=f"shared_memory:{shared_id}")
         conn.execute(
             """
             UPDATE shared_memories

@@ -25,6 +25,7 @@ from .schemas import (
     BootstrapRequest,
     BootstrapResponse,
     DeviceRequest,
+    DeviceTrustRequest,
     EnterprisePolicy,
     MembershipRequest,
     OverviewResponse,
@@ -102,16 +103,17 @@ def admin_console() -> str:
 </main>
 <script>
 const tokenInput = document.getElementById('token');
-tokenInput.value = localStorage.memoryosEnterpriseToken || '';
-tokenInput.addEventListener('input', () => localStorage.memoryosEnterpriseToken = tokenInput.value);
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (ch) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
 async function api(path, options = {}) {
   const res = await fetch(path, { ...options, headers: { 'Authorization': 'Bearer ' + tokenInput.value, 'Content-Type': 'application/json', ...(options.headers || {}) } });
   if (!res.ok) throw new Error(await res.text());
   return res.headers.get('content-type')?.includes('json') ? res.json() : res.text();
 }
 function table(rows, cols) {
-  return '<table><thead><tr>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr></thead><tbody>' +
-    rows.map(r => '<tr>' + cols.map(c => `<td>${r[c] ?? ''}</td>`).join('') + '</tr>').join('') + '</tbody></table>';
+  return '<table><thead><tr>' + cols.map(c => `<th>${escapeHtml(c)}</th>`).join('') + '</tr></thead><tbody>' +
+    rows.map(r => '<tr>' + cols.map(c => `<td>${escapeHtml(r[c])}</td>`).join('') + '</tr>').join('') + '</tbody></table>';
 }
 async function loadAll() {
   const overview = await api('/admin/overview');
@@ -122,10 +124,16 @@ async function loadAll() {
   document.getElementById('policy').value = JSON.stringify(overview.policy, null, 2);
   document.getElementById('users').innerHTML = table(overview.users, ['id','email','name','role','status','last_seen_at']);
   document.getElementById('teams').innerHTML = table(overview.teams, ['id','name','description','created_at']);
-  document.getElementById('devices').innerHTML = table(overview.devices, ['id','device_name','trust_state','policy_version','last_seen_at']);
+  document.getElementById('devices').innerHTML = table(overview.devices, ['id','device_name','trust_state','policy_version','last_seen_at']) +
+    '<p>Approve/revoke device by ID</p><input id="deviceId" placeholder="Device ID" /><p><button onclick="setDeviceTrust(\\'trusted\\')">Trust</button> <button onclick="setDeviceTrust(\\'revoked\\')">Revoke</button></p>';
   document.getElementById('scim').textContent = JSON.stringify(await api('/admin/scim/status'), null, 2);
 }
 async function savePolicy() { await api('/admin/policy', { method: 'PUT', body: document.getElementById('policy').value }); await loadAll(); }
+async function setDeviceTrust(trust_state) {
+  const id = document.getElementById('deviceId').value;
+  await api('/admin/devices/' + encodeURIComponent(id) + '/trust', { method: 'PUT', body: JSON.stringify({ trust_state }) });
+  await loadAll();
+}
 async function exportAudit() {
   const text = await api('/audit/export?format=jsonl');
   const blob = new Blob([text], { type: 'application/x-ndjson' });
@@ -339,6 +347,21 @@ def register_device(request: DeviceRequest, principal: Principal = Depends(requi
         )
         device_id = int(cursor.lastrowid)
         log_event(conn, principal.organization_id, principal.user_id, "user", "device_registered", "device", device_id, {"trust_state": trust_state})
+        conn.commit()
+        return row_dict(conn.execute("SELECT * FROM devices WHERE id = ?", (device_id,)).fetchone())
+
+
+@app.put("/admin/devices/{device_id}/trust")
+def update_device_trust(device_id: int, request: DeviceTrustRequest, principal: Principal = Depends(require_role("admin"))) -> dict[str, Any]:
+    with connect() as conn:
+        device = conn.execute("SELECT * FROM devices WHERE id = ? AND organization_id = ?", (device_id, principal.organization_id)).fetchone()
+        if not device:
+            raise HTTPException(status_code=404, detail="Device not found.")
+        conn.execute(
+            "UPDATE devices SET trust_state = ?, last_seen_at = ? WHERE id = ? AND organization_id = ?",
+            (request.trust_state, now(), device_id, principal.organization_id),
+        )
+        log_event(conn, principal.organization_id, principal.user_id, "user", "device_trust_updated", "device", device_id, {"trust_state": request.trust_state})
         conn.commit()
         return row_dict(conn.execute("SELECT * FROM devices WHERE id = ?", (device_id,)).fetchone())
 

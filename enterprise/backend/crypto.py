@@ -37,7 +37,7 @@ def decrypt_text(
     kms_key_id: Optional[str],
     aad: str,
 ) -> str:
-    if not ciphertext or not content_nonce or not encrypted_dek or not dek_nonce or not kms_key_id:
+    if not ciphertext or not content_nonce or not encrypted_dek or dek_nonce is None or not kms_key_id:
         return fallback
     dek = decrypt_data_key(encrypted_dek, dek_nonce, kms_key_id)
     plaintext = AESGCM(dek).decrypt(

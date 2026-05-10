@@ -85,6 +85,10 @@ class DeviceRequest(BaseModel):
     trust_state: Literal["pending", "trusted", "revoked"] = "pending"
 
 
+class DeviceTrustRequest(BaseModel):
+    trust_state: Literal["pending", "trusted", "revoked"]
+
+
 class ShareMemoryRequest(BaseModel):
     local_capture_id: int
     device_id: int

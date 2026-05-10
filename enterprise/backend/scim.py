@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hmac
+import re
 from typing import Any, Optional
 
 from fastapi import APIRouter, Header, HTTPException, Query
@@ -259,6 +260,10 @@ def patch_group(group_id: int, payload: dict[str, Any], authorization: Optional[
                         conn.execute("DELETE FROM team_memberships WHERE team_id = ? AND user_id = ?", (group_id, user_id))
                     else:
                         conn.execute("INSERT OR IGNORE INTO team_memberships (team_id, user_id, role) VALUES (?, ?, 'member')", (group_id, user_id))
+            if op == "remove" and path.startswith("members["):
+                match = re.search(r'value\s+eq\s+"?([^"\]]+)"?', path)
+                if match:
+                    conn.execute("DELETE FROM team_memberships WHERE team_id = ? AND user_id = ?", (group_id, int(match.group(1))))
         log_event(conn, org_id, None, "scim", "scim_group_patched", "team", group_id)
         conn.commit()
         row = conn.execute("SELECT * FROM teams WHERE id = ?", (group_id,)).fetchone()
@@ -270,6 +275,11 @@ def patch_group(group_id: int, payload: dict[str, Any], authorization: Optional[
 def delete_group(group_id: int, authorization: Optional[str] = Header(default=None)) -> None:
     org_id = require_scim(authorization)
     with connect() as conn:
+        project_ids = [int(row["id"]) for row in conn.execute("SELECT id FROM projects WHERE team_id = ?", (group_id,))]
+        if project_ids:
+            placeholders = ",".join(["?"] * len(project_ids))
+            conn.execute(f"DELETE FROM project_memberships WHERE project_id IN ({placeholders})", project_ids)
+        conn.execute("DELETE FROM team_memberships WHERE team_id = ?", (group_id,))
         conn.execute("UPDATE teams SET description = COALESCE(description, '') || ' [SCIM suspended]' WHERE id = ? AND organization_id = ?", (group_id, org_id))
         log_event(conn, org_id, None, "scim", "scim_group_suspended", "team", group_id)
         conn.commit()

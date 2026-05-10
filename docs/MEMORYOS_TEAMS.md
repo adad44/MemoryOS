@@ -67,7 +67,7 @@ The enterprise pipeline works in this order:
 3. **Identity and access**: provisioned organization, employee, team, project, role, and device state control access.
 4. **Team memory sync**: the employee-side sync worker posts selected or policy-approved captures into shared project memory.
 5. **Hermes Agent connector**: approved agents request bounded context by team or project through scoped grants.
-6. **Admin control plane**: companies manage policies, teams, shared memories, audit logs, retention, and access reviews through the enterprise API and browser admin console.
+6. **Admin control plane**: companies manage policies, teams, shared memories, device trust, audit logs, retention, and access reviews through the enterprise API, with browser-console coverage for overview, policy, devices, SCIM status, and audit export.
 7. **Enterprise security**: encryption, redaction, SSO, device trust, export/delete controls, and audit trails make the system acceptable for real organizations.
 
 Every step must preserve the product rule: employees own private work memory, companies own shared project memory, and policies decide what crosses the boundary.
@@ -232,7 +232,7 @@ Included:
 - Shared team memory is stored separately as redacted `shared_memories`.
 - Admin-managed policy publishing and device policy sync.
 - SCIM user and group provisioning.
-- Browser admin console for overview, policy, users, teams, devices, SCIM status, and audit export.
+- Browser admin console for overview, policy, users, teams, device trust, SCIM status, and audit export.
 - Optional envelope encryption and blind search for shared memory.
 - Hermes Agent context endpoint for scoped team/project context.
 - Audit rows for bootstrap, user provisioning, policy publish, device registration, team/project creation, memory share, agent grant, agent context read, and audit export.
