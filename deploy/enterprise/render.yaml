@@ -1,0 +1,40 @@
+services:
+  - type: web
+    name: memoryos-enterprise
+    runtime: docker
+    dockerfilePath: deploy/enterprise/Dockerfile
+    plan: standard
+    healthCheckPath: /health
+    disks:
+      - name: memoryos-enterprise-data
+        mountPath: /data
+        sizeGB: 10
+    envVars:
+      - key: MEMORYOS_ENTERPRISE_ENABLED
+        value: "true"
+      - key: MEMORYOS_ENTERPRISE_HOST
+        value: "0.0.0.0"
+      - key: MEMORYOS_ENTERPRISE_PORT
+        value: "8775"
+      - key: MEMORYOS_ENTERPRISE_DATABASE_ENGINE
+        value: "sqlite"
+      - key: MEMORYOS_ENTERPRISE_DB
+        value: /data/enterprise.db
+      - key: MEMORYOS_ENTERPRISE_BOOTSTRAP_TOKEN
+        sync: false
+      - key: MEMORYOS_ENTERPRISE_OIDC_ISSUER
+        sync: false
+      - key: MEMORYOS_ENTERPRISE_OIDC_AUDIENCE
+        value: memoryos-enterprise
+      - key: MEMORYOS_ENTERPRISE_OIDC_JWKS_URL
+        sync: false
+      - key: MEMORYOS_ENTERPRISE_SCIM_TOKEN
+        sync: false
+      - key: MEMORYOS_ENTERPRISE_ENCRYPTION_ENABLED
+        value: "true"
+      - key: MEMORYOS_ENTERPRISE_KMS_PROVIDER
+        value: local
+      - key: MEMORYOS_ENTERPRISE_LOCAL_KMS_MASTER_KEY
+        sync: false
+      - key: MEMORYOS_ENTERPRISE_SEARCH_INDEX_KEY
+        sync: false

@@ -1,0 +1,17 @@
+services:
+  memoryos-enterprise:
+    build:
+      context: ../..
+      dockerfile: deploy/enterprise/Dockerfile
+    ports:
+      - "8775:8775"
+    env_file:
+      - .env.example
+    volumes:
+      - memoryos-enterprise-data:/data
+    environment:
+      MEMORYOS_ENTERPRISE_ENABLED: "true"
+      MEMORYOS_ENTERPRISE_DB: /data/enterprise.db
+
+volumes:
+  memoryos-enterprise-data:

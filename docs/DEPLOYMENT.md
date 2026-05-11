@@ -117,6 +117,45 @@ Set `VITE_API_URL` if the backend URL differs:
 VITE_API_URL=http://127.0.0.1:8765 npm run build
 ```
 
+## Enterprise Teams Backend
+
+MemoryOS Teams Enterprise is deployed separately from the personal local MemoryOS app.
+
+Deployment templates live in:
+
+```text
+deploy/enterprise/
+```
+
+Included:
+
+- Dockerfile for the enterprise API.
+- Docker Compose pilot stack with persistent enterprise data volume.
+- Render blueprint with required secret placeholders.
+- Environment example for SSO, SCIM, envelope encryption, KMS, and CORS.
+- Postgres schema contract in `enterprise/backend/schema_postgres.sql`.
+
+Local pilot:
+
+```sh
+cd deploy/enterprise
+docker compose up --build
+```
+
+Enterprise API health:
+
+```sh
+curl http://127.0.0.1:8775/health
+```
+
+Admin console:
+
+```text
+http://127.0.0.1:8775/admin/console
+```
+
+The current runtime adapter is SQLite-first. `MEMORYOS_ENTERPRISE_DATABASE_ENGINE=postgres` and `MEMORYOS_ENTERPRISE_DATABASE_URL` are reserved for the hosted managed-Postgres rollout; the Postgres schema and deployment contract are present, but the runtime adapter should only be enabled after a Postgres smoke test is added.
+
 ## Distribution Notes
 
 For local development, the unsigned app bundle is enough. For broader distribution:

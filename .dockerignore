@@ -1,0 +1,11 @@
+.git
+.venv
+**/__pycache__
+**/.DS_Store
+web/node_modules
+web/dist
+presentation-workspace/node_modules
+netlify-memoryos-page/.netlify
+*.db
+*.sqlite
+*.log
