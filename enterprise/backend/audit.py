@@ -52,4 +52,3 @@ def parse_details(row: dict[str, Any]) -> dict[str, Any]:
     except Exception:
         row["details"] = {}
     return row
-
